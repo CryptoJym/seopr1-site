@@ -4,6 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SEOPR1 — AI Search Visibility &amp; Automation for Firms</title>
+<meta name="description" content="AI doesn't rank — it recommends. SEOPR1 tunes your firm's presence so AI cites you by name. AI visibility and automation for professional firms.">
+
+<!-- Favicon -->
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+<!-- Open Graph / Social Sharing -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://seopr1.com/">
+<meta property="og:title" content="SEOPR1 — AI Search Visibility &amp; Automation">
+<meta property="og:description" content="AI doesn't rank — it recommends. Tune your firm to the frequency AI listens on.">
+<meta property="og:image" content="https://seopr1.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SEOPR1 — AI Search Visibility &amp; Automation">
+<meta name="twitter:description" content="AI doesn't rank — it recommends. Tune your firm to the frequency AI listens on.">
+<meta name="twitter:image" content="https://seopr1.com/og-image.png">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
@@ -539,12 +560,7 @@ panels.forEach((panel, i) => {
     opacity: 1, y: 0, duration: 1, ease: 'power2.out',
     scrollTrigger: { trigger: panel.closest('.content-section'), start: 'top 70%', end: 'top 25%', scrub: 0.6 }
   });
-  if (i < panels.length - 1) {
-    gsap.to(panel, {
-      opacity: 0, y: -40, duration: 1,
-      scrollTrigger: { trigger: panel.closest('.content-section'), start: 'bottom 55%', end: 'bottom 20%', scrub: 0.6 }
-    });
-  }
+  /* Text stays visible — no fade-out, scrolls off naturally */
 });
 
 /* ── Scroll hint ──────────────────────────────── */
