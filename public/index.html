@@ -197,10 +197,29 @@
     background: linear-gradient(90deg, #b0b0b8, #d0d0d8);
     margin: 0 auto 1.5rem;
   }
+
+  #reality-wrapper {
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+  }
+  #reality-wrapper.rippling {
+    filter: url(#reality-ripple);
+    will-change: filter;
+  }
 </style>
 </head>
 <body>
 
+<!-- SVG displacement filter for reality-ripple effect -->
+<svg style="position:absolute;width:0;height:0;pointer-events:none" aria-hidden="true">
+  <filter id="reality-ripple" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence id="ripple-turb" type="turbulence" baseFrequency="0.01 0.01" numOctaves="2" seed="3" result="turb"/>
+    <feDisplacementMap id="ripple-displace" in="SourceGraphic" in2="turb" scale="0" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+
+<div id="reality-wrapper">
 <div id="bg-overlay"></div>
 <div class="progress-bar" id="progressBar"></div>
 <canvas id="ripple-canvas"></canvas>
@@ -590,6 +609,11 @@ const RIPPLE_INTERVAL  = 0.12; // seconds between successive ring births (tighte
 const SHAKE_AMP        = 0.08; // camera shake amplitude
 const SHAKE_FREQ       = 18;   // camera shake frequency Hz
 
+// Reality-ripple elements
+const realityWrapper = document.getElementById('reality-wrapper');
+const rippleDisplace = document.getElementById('ripple-displace');
+const rippleTurb = document.getElementById('ripple-turb');
+
 // Trigger strike when final section enters view
 ScrollTrigger.create({
   trigger: '#start',
@@ -600,6 +624,7 @@ ScrollTrigger.create({
       strikeHasFired = true;
       strikeActive = true;
       strikeTime = 0;
+      realityWrapper.classList.add('rippling');
     }
   }
 });
@@ -908,9 +933,23 @@ function animate() {
   if (strikeActive) {
     strikeTime += dt;
     vibrateProng(dt);
+
+    // ── Reality-ripple: distort the entire page via SVG filter ──
+    const rippleDecay = Math.exp(-strikeTime * 0.8);
+    // Wave-like pulsing displacement that decays over time
+    const wavePhase = Math.sin(strikeTime * VIBRATION_FREQ * Math.PI * 2);
+    const displaceScale = rippleDecay * 35 * (0.5 + 0.5 * Math.abs(wavePhase));
+    // Animate turbulence frequency to make waves appear to move outward
+    const freq = 0.008 + strikeTime * 0.003;
+    rippleDisplace.setAttribute('scale', displaceScale.toFixed(1));
+    rippleTurb.setAttribute('baseFrequency', `${freq.toFixed(4)} ${freq.toFixed(4)}`);
+
     if (strikeTime > STRIKE_DURATION) {
       strikeActive = false;
       rippleCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      // Remove filter for performance
+      rippleDisplace.setAttribute('scale', '0');
+      realityWrapper.classList.remove('rippling');
     }
   }
 
@@ -929,5 +968,6 @@ window.addEventListener('resize', () => {
   sizeRippleCanvas();
 });
 </script>
+</div><!-- /reality-wrapper -->
 </body>
 </html>
