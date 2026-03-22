@@ -787,15 +787,15 @@ function animate() {
   }
   function rgb(c) { return `rgb(${c[0]},${c[1]},${c[2]})`; }
 
-  // Light mode → Dark mode color pairs
-  const titleL = [54,69,79], titleD = [242,242,242];
-  const tagL   = [112,128,144], tagD = [106,106,120];
-  const bodyL  = [112,128,144], bodyD = [138,138,152];
-  const navL   = [54,69,79], navD = [240,240,240];
-  const navLnkL = [112,128,144], navLnkD = [136,136,136];
+  // Light mode → Dark mode color pairs (dark-mode values pushed bright for strong contrast)
+  const titleL = [54,69,79], titleD = [255,255,255];
+  const tagL   = [112,128,144], tagD = [200,200,215];
+  const bodyL  = [112,128,144], bodyD = [210,210,220];
+  const navL   = [54,69,79], navD = [245,245,245];
+  const navLnkL = [112,128,144], navLnkD = [200,200,210];
   const btnBgL = [54,69,79], btnBgD = [255,255,255];
   const btnTxL = [255,255,255], btnTxD = [54,69,79];
-  const ghostL = [54,69,79], ghostD = [242,242,242];
+  const ghostL = [54,69,79], ghostD = [255,255,255];
 
   // Ultra-steep text color flip — text transitions way ahead of background
   // so there's always strong contrast (no gray-on-gray dead zone)
