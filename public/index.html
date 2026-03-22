@@ -581,12 +581,14 @@ let strikeActive   = false;
 let strikeTime     = 0;      // seconds since strike
 let strikeHasFired = false;  // only fires once per page load
 
-const STRIKE_DURATION  = 4.5;  // total effect duration in seconds
+const STRIKE_DURATION  = 6.0;  // total effect duration in seconds
 const VIBRATION_FREQ   = 28;   // Hz — vibration frequency of prongs
-const VIBRATION_AMP    = 0.04; // max lateral displacement
-const RIPPLE_COUNT     = 6;    // number of expanding rings per pole
-const RIPPLE_SPEED     = 380;  // pixels per second expansion rate
-const RIPPLE_INTERVAL  = 0.18; // seconds between successive ring births
+const VIBRATION_AMP    = 0.12; // max lateral displacement (3x bigger)
+const RIPPLE_COUNT     = 10;   // number of expanding rings per pole
+const RIPPLE_SPEED     = 600;  // pixels per second expansion rate (faster, bigger)
+const RIPPLE_INTERVAL  = 0.12; // seconds between successive ring births (tighter)
+const SHAKE_AMP        = 0.08; // camera shake amplitude
+const SHAKE_FREQ       = 18;   // camera shake frequency Hz
 
 // Trigger strike when final section enters view
 ScrollTrigger.create({
@@ -641,34 +643,64 @@ function drawRipples(dt) {
     : Math.max(0, 1 - (strikeTime - 0.12) / (STRIKE_DURATION - 0.12));
   const env2 = envelope * envelope;
 
-  // ── Screen-wide distortion pulse ───────────
-  // Subtle vignette flash that pulses with the strike
-  if (strikeTime < 1.5) {
-    const pulseA = Math.max(0, 1 - strikeTime / 1.5) * 0.12;
-    const grad = rippleCtx.createRadialGradient(W/2, H/2, H*0.1, W/2, H/2, H*0.8);
-    grad.addColorStop(0, `rgba(255,255,255,0)`);
-    grad.addColorStop(0.7, `rgba(200,200,220,0)`);
-    grad.addColorStop(1, `rgba(180,180,200,${pulseA})`);
+  // ── FULL-SCREEN SHOCKWAVE PULSE ───────────
+  // Massive white flash that blasts outward from center
+  if (strikeTime < 0.3) {
+    const blastA = Math.max(0, 1 - strikeTime / 0.3) * 0.35;
+    rippleCtx.fillStyle = `rgba(255,255,255,${blastA})`;
+    rippleCtx.fillRect(0, 0, W, H);
+  }
+
+  // Lingering screen-wide pulsing distortion
+  if (strikeTime < 3.0) {
+    const pulsePhase = Math.sin(strikeTime * VIBRATION_FREQ * Math.PI * 2);
+    const pulseDecay = Math.max(0, 1 - strikeTime / 3.0);
+    const pulseA = pulseDecay * pulseDecay * Math.abs(pulsePhase) * 0.08;
+    const grad = rippleCtx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H) * 0.7);
+    grad.addColorStop(0, `rgba(255,255,255,${pulseA * 0.5})`);
+    grad.addColorStop(0.3, `rgba(220,220,240,${pulseA})`);
+    grad.addColorStop(0.7, `rgba(200,200,220,${pulseA * 0.6})`);
+    grad.addColorStop(1, `rgba(180,180,200,0)`);
     rippleCtx.fillStyle = grad;
     rippleCtx.fillRect(0, 0, W, H);
   }
 
-  // ── Central flash at each pole ─────────────
-  if (strikeTime < 0.5) {
-    const flashA = Math.max(0, 1 - strikeTime / 0.5);
+  // ── DRAMATIC FLASH at each pole ─────────────
+  if (strikeTime < 0.8) {
+    const flashA = Math.max(0, 1 - strikeTime / 0.8);
     [screenL, screenR].forEach(pole => {
-      // Layered radial gradient: hot core → warm halo → fade
-      const r1 = 80 + strikeTime * 120;
+      const r1 = 150 + strikeTime * 250;
       const grad = rippleCtx.createRadialGradient(pole.x, pole.y, 0, pole.x, pole.y, r1);
-      grad.addColorStop(0, `rgba(255,255,255,${flashA * 0.7})`);
-      grad.addColorStop(0.15, `rgba(220,220,235,${flashA * 0.4})`);
-      grad.addColorStop(0.5, `rgba(180,180,200,${flashA * 0.1})`);
+      grad.addColorStop(0, `rgba(255,255,255,${flashA * 0.9})`);
+      grad.addColorStop(0.1, `rgba(240,240,255,${flashA * 0.6})`);
+      grad.addColorStop(0.3, `rgba(200,200,230,${flashA * 0.25})`);
+      grad.addColorStop(0.6, `rgba(180,180,210,${flashA * 0.08})`);
       grad.addColorStop(1, `rgba(180,180,200,0)`);
       rippleCtx.fillStyle = grad;
       rippleCtx.beginPath();
       rippleCtx.arc(pole.x, pole.y, r1, 0, Math.PI * 2);
       rippleCtx.fill();
     });
+  }
+
+  // ── EXPANDING SHOCKWAVE RING (single massive ring) ──
+  if (strikeTime > 0.05 && strikeTime < 2.5) {
+    const shockAge = strikeTime - 0.05;
+    const shockR = shockAge * 800;
+    const shockA = Math.max(0, 1 - shockAge / 2.5) * 0.4;
+    const midX = (screenL.x + screenR.x) / 2;
+    const midY = (screenL.y + screenR.y) / 2;
+    rippleCtx.beginPath();
+    rippleCtx.arc(midX, midY, shockR, 0, Math.PI * 2);
+    rippleCtx.strokeStyle = `rgba(255,255,255,${shockA})`;
+    rippleCtx.lineWidth = Math.max(2, 12 - shockAge * 4);
+    rippleCtx.stroke();
+    // Thick glow behind shockwave
+    rippleCtx.beginPath();
+    rippleCtx.arc(midX, midY, shockR, 0, Math.PI * 2);
+    rippleCtx.strokeStyle = `rgba(200,200,230,${shockA * 0.3})`;
+    rippleCtx.lineWidth = Math.max(4, 40 - shockAge * 15);
+    rippleCtx.stroke();
   }
 
   // ── Expanding ripple rings ─────────────────
@@ -685,44 +717,47 @@ function drawRipples(dt) {
 
       if (ringAlpha < 0.003) continue;
 
-      // Primary ring — fine, bright
-      const lw = Math.max(0.4, 1.8 - radius * 0.001);
+      // Primary ring — bold and bright
+      const lw = Math.max(1.0, 3.5 - radius * 0.002);
       rippleCtx.beginPath();
       rippleCtx.arc(pole.x, pole.y, radius, 0, Math.PI * 2);
-      rippleCtx.strokeStyle = `rgba(210,210,225,${ringAlpha * 0.5})`;
+      rippleCtx.strokeStyle = `rgba(230,230,245,${ringAlpha * 0.7})`;
       rippleCtx.lineWidth = lw;
       rippleCtx.stroke();
 
-      // Soft glow halo behind the ring
-      if (ringAlpha > 0.05) {
+      // Wide glow halo behind the ring
+      if (ringAlpha > 0.03) {
         rippleCtx.beginPath();
         rippleCtx.arc(pole.x, pole.y, radius, 0, Math.PI * 2);
-        rippleCtx.strokeStyle = `rgba(200,200,220,${ringAlpha * 0.12})`;
-        rippleCtx.lineWidth = lw * 6;
+        rippleCtx.strokeStyle = `rgba(210,210,235,${ringAlpha * 0.2})`;
+        rippleCtx.lineWidth = lw * 10;
         rippleCtx.stroke();
       }
 
-      // Ghost ring (offset slightly for interference depth)
-      if (r % 2 === 0 && ringAlpha > 0.08) {
+      // Ghost ring
+      if (r % 2 === 0 && ringAlpha > 0.05) {
         rippleCtx.beginPath();
-        rippleCtx.arc(pole.x, pole.y, radius * 1.03, 0, Math.PI * 2);
-        rippleCtx.strokeStyle = `rgba(230,230,240,${ringAlpha * 0.15})`;
-        rippleCtx.lineWidth = lw * 0.5;
+        rippleCtx.arc(pole.x, pole.y, radius * 1.04, 0, Math.PI * 2);
+        rippleCtx.strokeStyle = `rgba(240,240,255,${ringAlpha * 0.25})`;
+        rippleCtx.lineWidth = lw * 0.7;
         rippleCtx.stroke();
       }
     }
   });
 
   // ── Interference pattern where rings from both poles overlap ──
-  if (strikeTime > 0.3 && strikeTime < 3.5) {
+  if (strikeTime > 0.2 && strikeTime < 4.5) {
     const midX = (screenL.x + screenR.x) / 2;
     const midY = (screenL.y + screenR.y) / 2;
-    const intA = Math.min(1, (strikeTime - 0.3) / 0.5) * Math.max(0, 1 - (strikeTime - 0.3) / 3.0);
-    const intR = 30 + strikeTime * 40;
+    const intA = Math.min(1, (strikeTime - 0.2) / 0.4) * Math.max(0, 1 - (strikeTime - 0.2) / 4.0);
+    // Pulsing interference — beats between the two wave sources
+    const beat = Math.sin(strikeTime * 12) * 0.5 + 0.5;
+    const intR = 60 + strikeTime * 80;
     const grad = rippleCtx.createRadialGradient(midX, midY, 0, midX, midY, intR);
-    grad.addColorStop(0, `rgba(255,255,255,${intA * 0.18})`);
-    grad.addColorStop(0.5, `rgba(210,210,225,${intA * 0.06})`);
-    grad.addColorStop(1, `rgba(210,210,225,0)`);
+    grad.addColorStop(0, `rgba(255,255,255,${intA * beat * 0.35})`);
+    grad.addColorStop(0.3, `rgba(220,220,240,${intA * beat * 0.15})`);
+    grad.addColorStop(0.7, `rgba(200,200,225,${intA * 0.05})`);
+    grad.addColorStop(1, `rgba(200,200,225,0)`);
     rippleCtx.fillStyle = grad;
     rippleCtx.beginPath();
     rippleCtx.arc(midX, midY, intR, 0, Math.PI * 2);
@@ -853,6 +888,15 @@ function animate() {
   camera.position.z = Math.cos(scrollState.camAngle) * camDist;
   camera.position.y = scrollState.camY;
   camera.lookAt(0, 0, 0);
+
+  /* ── Camera shake from strike vibration ────── */
+  if (strikeActive) {
+    const shakeDecay = Math.exp(-strikeTime * 1.5);
+    const shakeX = Math.sin(strikeTime * SHAKE_FREQ * Math.PI * 2) * SHAKE_AMP * shakeDecay;
+    const shakeY = Math.cos(strikeTime * SHAKE_FREQ * 1.3 * Math.PI * 2) * SHAKE_AMP * 0.6 * shakeDecay;
+    camera.position.x += shakeX;
+    camera.position.y += shakeY;
+  }
 
   /* ── Lighting ───────────────────────────────── */
   keyLight.intensity = 1.2 + p * 0.6;
