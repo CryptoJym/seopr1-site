@@ -797,8 +797,10 @@ function animate() {
   const btnTxL = [255,255,255], btnTxD = [54,69,79];
   const ghostL = [54,69,79], ghostD = [242,242,242];
 
-  // Smooth eased transition (steeper in the middle for crisp crossover)
-  const ease = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p+2,2)/2;
+  // Ultra-steep text color flip — text transitions way ahead of background
+  // so there's always strong contrast (no gray-on-gray dead zone)
+  const textP = Math.min(1, Math.max(0, (p - 0.15) / 0.25)); // remap: starts at p=0.15, done by p=0.40
+  const ease = textP < 0.5 ? 2*textP*textP : 1 - Math.pow(-2*textP+2,2)/2;
 
   document.querySelectorAll('.hero-title, .section-title').forEach(el => el.style.color = rgb(lerpC(titleL, titleD, ease)));
   document.querySelectorAll('.hero-tag, .section-tag').forEach(el => el.style.color = rgb(lerpC(tagL, tagD, ease)));
