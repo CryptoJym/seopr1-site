@@ -221,6 +221,14 @@
 </head>
 <body>
 
+<!-- SVG filter for DOM element ripple distortion (applied per-element, not wrapper) -->
+<svg style="position:absolute;width:0;height:0;pointer-events:none" aria-hidden="true">
+  <filter id="dom-ripple" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence id="dom-turb" type="turbulence" baseFrequency="0.015 0.008" numOctaves="3" seed="5" result="turb"/>
+    <feDisplacementMap id="dom-displace" in="SourceGraphic" in2="turb" scale="0" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+
 <div id="bg-overlay"></div>
 <div class="progress-bar" id="progressBar"></div>
 <canvas id="ripple-canvas"></canvas>
@@ -677,6 +685,11 @@ const SHAKE_FREQ       = 18;   // camera shake frequency Hz
 // Post-process ripple state
 let usePostRipple = false;
 
+// DOM elements to apply SVG ripple filter to
+const domRippleEls = [];
+const domDisplace = document.getElementById('dom-displace');
+const domTurb = document.getElementById('dom-turb');
+
 // Trigger strike when final section enters view
 ScrollTrigger.create({
   trigger: '#start',
@@ -688,9 +701,12 @@ ScrollTrigger.create({
       strikeActive = true;
       strikeTime = 0;
       usePostRipple = true;
-      // Trigger CSS ripple on CTA text
-      const ctaSection = document.getElementById('start');
-      if (ctaSection) ctaSection.classList.add('cta-ripple');
+      // Apply SVG ripple filter to all visible DOM content
+      document.querySelectorAll('.content-panel, nav, .scroll-hint, .progress-bar').forEach(el => {
+        el.style.filter = 'url(#dom-ripple)';
+        el.style.willChange = 'filter';
+        domRippleEls.push(el);
+      });
     }
   }
 });
@@ -991,7 +1007,20 @@ function animate() {
   /* ── Strike effect ──────────────────────────── */
   if (strikeActive) {
     strikeTime += dt;
-    /* prong vibration removed — pure visual ripple only */
+
+    // ── Animate SVG displacement filter on DOM elements ──
+    if (domDisplace && domTurb && domRippleEls.length > 0) {
+      const domDecay = Math.exp(-strikeTime * 0.6);
+      // Displacement scale: starts strong (30), decays smoothly
+      const dispScale = domDecay * 30;
+      domDisplace.setAttribute('scale', dispScale.toFixed(2));
+      // Animate turbulence frequency for organic wave motion
+      const freqBase = 0.012 + Math.sin(strikeTime * 1.8) * 0.008 * domDecay;
+      const freqY = freqBase * 0.55;
+      domTurb.setAttribute('baseFrequency', `${freqBase.toFixed(4)} ${freqY.toFixed(4)}`);
+      // Shift the turbulence seed over time for flowing movement
+      domTurb.setAttribute('seed', Math.floor(strikeTime * 8).toString());
+    }
 
     // ── Post-process ripple is handled via the shader (see below) ──
 
@@ -999,6 +1028,13 @@ function animate() {
       strikeActive = false;
       rippleCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
       usePostRipple = false;
+      // Clean up DOM ripple filters
+      domRippleEls.forEach(el => {
+        el.style.filter = '';
+        el.style.willChange = '';
+      });
+      domRippleEls.length = 0;
+      if (domDisplace) domDisplace.setAttribute('scale', '0');
     }
   }
 
