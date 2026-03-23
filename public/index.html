@@ -750,20 +750,29 @@ function drawRipples(dt) {
     : Math.max(0, 1 - (strikeTime - 0.12) / (STRIKE_DURATION - 0.12));
   const env2 = envelope * envelope;
 
-  // ── FULL-SCREEN SHOCKWAVE PULSE ───────────
-  // Massive white flash that blasts outward from center
+  // ── Epicenter: fork midpoint on screen (used by all effects below) ──
+  const epicenterX = (screenL.x + screenR.x) / 2;
+  const epicenterY = (screenL.y + screenR.y) / 2;
+
+  // ── SHOCKWAVE PULSE from fork epicenter ─────
   if (strikeTime < 0.3) {
-    const blastA = Math.max(0, 1 - strikeTime / 0.3) * 0.35;
-    rippleCtx.fillStyle = `rgba(255,255,255,${blastA})`;
+    const blastA = Math.max(0, 1 - strikeTime / 0.3) * 0.45;
+    const blastR = 80 + strikeTime * 2500; // rapidly expanding flash
+    const grad = rippleCtx.createRadialGradient(epicenterX, epicenterY, 0, epicenterX, epicenterY, blastR);
+    grad.addColorStop(0, `rgba(255,255,255,${blastA})`);
+    grad.addColorStop(0.2, `rgba(240,240,255,${blastA * 0.7})`);
+    grad.addColorStop(0.5, `rgba(220,220,240,${blastA * 0.3})`);
+    grad.addColorStop(1, `rgba(200,200,220,0)`);
+    rippleCtx.fillStyle = grad;
     rippleCtx.fillRect(0, 0, W, H);
   }
 
-  // Lingering screen-wide pulsing distortion
+  // Lingering screen-wide pulsing distortion — emanates from fork midpoint
   if (strikeTime < 3.0) {
     const pulsePhase = Math.sin(strikeTime * VIBRATION_FREQ * Math.PI * 2);
     const pulseDecay = Math.max(0, 1 - strikeTime / 3.0);
     const pulseA = pulseDecay * pulseDecay * Math.abs(pulsePhase) * 0.08;
-    const grad = rippleCtx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H) * 0.7);
+    const grad = rippleCtx.createRadialGradient(epicenterX, epicenterY, 0, epicenterX, epicenterY, Math.max(W, H) * 0.7);
     grad.addColorStop(0, `rgba(255,255,255,${pulseA * 0.5})`);
     grad.addColorStop(0.3, `rgba(220,220,240,${pulseA})`);
     grad.addColorStop(0.7, `rgba(200,200,220,${pulseA * 0.6})`);
@@ -790,21 +799,19 @@ function drawRipples(dt) {
     });
   }
 
-  // ── EXPANDING SHOCKWAVE RING (single massive ring) ──
+  // ── EXPANDING SHOCKWAVE RING (single massive ring from epicenter) ──
   if (strikeTime > 0.05 && strikeTime < 2.5) {
     const shockAge = strikeTime - 0.05;
     const shockR = shockAge * 800;
     const shockA = Math.max(0, 1 - shockAge / 2.5) * 0.4;
-    const midX = (screenL.x + screenR.x) / 2;
-    const midY = (screenL.y + screenR.y) / 2;
     rippleCtx.beginPath();
-    rippleCtx.arc(midX, midY, shockR, 0, Math.PI * 2);
+    rippleCtx.arc(epicenterX, epicenterY, shockR, 0, Math.PI * 2);
     rippleCtx.strokeStyle = `rgba(255,255,255,${shockA})`;
     rippleCtx.lineWidth = Math.max(2, 12 - shockAge * 4);
     rippleCtx.stroke();
     // Thick glow behind shockwave
     rippleCtx.beginPath();
-    rippleCtx.arc(midX, midY, shockR, 0, Math.PI * 2);
+    rippleCtx.arc(epicenterX, epicenterY, shockR, 0, Math.PI * 2);
     rippleCtx.strokeStyle = `rgba(200,200,230,${shockA * 0.3})`;
     rippleCtx.lineWidth = Math.max(4, 40 - shockAge * 15);
     rippleCtx.stroke();
@@ -854,20 +861,18 @@ function drawRipples(dt) {
 
   // ── Interference pattern where rings from both poles overlap ──
   if (strikeTime > 0.2 && strikeTime < 4.5) {
-    const midX = (screenL.x + screenR.x) / 2;
-    const midY = (screenL.y + screenR.y) / 2;
     const intA = Math.min(1, (strikeTime - 0.2) / 0.4) * Math.max(0, 1 - (strikeTime - 0.2) / 4.0);
     // Pulsing interference — beats between the two wave sources
     const beat = Math.sin(strikeTime * 12) * 0.5 + 0.5;
     const intR = 60 + strikeTime * 80;
-    const grad = rippleCtx.createRadialGradient(midX, midY, 0, midX, midY, intR);
+    const grad = rippleCtx.createRadialGradient(epicenterX, epicenterY, 0, epicenterX, epicenterY, intR);
     grad.addColorStop(0, `rgba(255,255,255,${intA * beat * 0.35})`);
     grad.addColorStop(0.3, `rgba(220,220,240,${intA * beat * 0.15})`);
     grad.addColorStop(0.7, `rgba(200,200,225,${intA * 0.05})`);
     grad.addColorStop(1, `rgba(200,200,225,0)`);
     rippleCtx.fillStyle = grad;
     rippleCtx.beginPath();
-    rippleCtx.arc(midX, midY, intR, 0, Math.PI * 2);
+    rippleCtx.arc(epicenterX, epicenterY, intR, 0, Math.PI * 2);
     rippleCtx.fill();
   }
 }
@@ -1009,17 +1014,55 @@ function animate() {
     strikeTime += dt;
 
     // ── Animate SVG displacement filter on DOM elements ──
+    // Each element gets its own displacement based on distance from fork epicenter,
+    // so the ripple propagates outward from the tuning fork's prong tips.
     if (domDisplace && domTurb && domRippleEls.length > 0) {
-      const domDecay = Math.exp(-strikeTime * 0.6);
-      // Displacement scale: starts strong (30), decays smoothly
-      const dispScale = domDecay * 30;
-      domDisplace.setAttribute('scale', dispScale.toFixed(2));
-      // Animate turbulence frequency for organic wave motion
-      const freqBase = 0.012 + Math.sin(strikeTime * 1.8) * 0.008 * domDecay;
+      // Get fork epicenter in screen coords
+      const [tipL, tipR] = getProngTipWorldPositions();
+      const sL = projectToScreen(tipL);
+      const sR = projectToScreen(tipR);
+      const forkCX = (sL.x + sR.x) / 2;
+      const forkCY = (sL.y + sR.y) / 2;
+
+      // Animate global turbulence frequency for organic wave motion
+      const globalDecay = Math.exp(-strikeTime * 0.6);
+      const freqBase = 0.012 + Math.sin(strikeTime * 1.8) * 0.008 * globalDecay;
       const freqY = freqBase * 0.55;
       domTurb.setAttribute('baseFrequency', `${freqBase.toFixed(4)} ${freqY.toFixed(4)}`);
-      // Shift the turbulence seed over time for flowing movement
       domTurb.setAttribute('seed', Math.floor(strikeTime * 8).toString());
+
+      // Ripple wavefront expands outward from epicenter
+      const wavefrontRadius = strikeTime * 450; // px per second expansion
+      const wavefrontWidth = 300; // width of the active ripple band
+
+      domRippleEls.forEach(el => {
+        const rect = el.getBoundingClientRect();
+        const elCX = rect.left + rect.width / 2;
+        const elCY = rect.top + rect.height / 2;
+        const dist = Math.sqrt((elCX - forkCX) ** 2 + (elCY - forkCY) ** 2);
+
+        // How close is this element to the current wavefront?
+        const distFromWavefront = Math.abs(dist - wavefrontRadius);
+        // Element is in the active ripple band — intensity peaks at wavefront
+        const bandInfluence = Math.max(0, 1 - distFromWavefront / wavefrontWidth);
+        // Overall decay envelope
+        const elDecay = Math.exp(-strikeTime * 0.5);
+        // Combined: wavefront proximity * decay * base intensity
+        const elScale = bandInfluence * elDecay * 35;
+
+        // Apply per-element scale via unique filter if needed,
+        // or use the shared filter with element-specific CSS transform to fake it
+        // Since SVG filter scale is shared, modulate via opacity + CSS transform
+        const ripplePhase = Math.sin((dist * 0.008) - strikeTime * 4) * bandInfluence * elDecay;
+        const tx = ripplePhase * 3;
+        const ty = ripplePhase * 1.5;
+        el.style.transform = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px)`;
+        el.style.transition = 'none';
+      });
+
+      // Set shared filter displacement to the max active level
+      const peakScale = globalDecay * 30;
+      domDisplace.setAttribute('scale', peakScale.toFixed(2));
     }
 
     // ── Post-process ripple is handled via the shader (see below) ──
@@ -1028,10 +1071,12 @@ function animate() {
       strikeActive = false;
       rippleCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
       usePostRipple = false;
-      // Clean up DOM ripple filters
+      // Clean up DOM ripple filters and transforms
       domRippleEls.forEach(el => {
         el.style.filter = '';
         el.style.willChange = '';
+        el.style.transform = '';
+        el.style.transition = '';
       });
       domRippleEls.length = 0;
       if (domDisplace) domDisplace.setAttribute('scale', '0');
@@ -1044,8 +1089,17 @@ function animate() {
     rippleShaderMat.uniforms.uTime.value = strikeTime;
     const decay = Math.exp(-strikeTime * 0.5);
     rippleShaderMat.uniforms.uIntensity.value = decay;
-    // Center = fork position on screen (roughly center-top)
-    rippleShaderMat.uniforms.uCenter.value.set(0.5, 0.55);
+    // ── Dynamic epicenter: project fork midpoint to UV space ──
+    const [wlS, wrS] = getProngTipWorldPositions();
+    const midWorld = new V3(
+      (wlS.x + wrS.x) / 2,
+      (wlS.y + wrS.y) / 2,
+      (wlS.z + wrS.z) / 2
+    );
+    const projected = midWorld.clone().project(camera);
+    const uvX = projected.x * 0.5 + 0.5;
+    const uvY = projected.y * 0.5 + 0.5; // UV y is bottom-up in shader
+    rippleShaderMat.uniforms.uCenter.value.set(uvX, uvY);
 
     // Pass 1: render scene to texture
     renderer.setRenderTarget(renderTarget);
