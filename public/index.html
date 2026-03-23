@@ -198,6 +198,25 @@
     margin: 0 auto 1.5rem;
   }
 
+  /* Ripple animation for CTA text */
+  @keyframes textRipple {
+    0%   { transform: translateY(0) scaleY(1); }
+    15%  { transform: translateY(-3px) scaleY(1.01); }
+    30%  { transform: translateY(2px) scaleY(0.99); }
+    50%  { transform: translateY(-1.5px) scaleY(1.005); }
+    70%  { transform: translateY(1px) scaleY(0.998); }
+    85%  { transform: translateY(-0.5px) scaleY(1.002); }
+    100% { transform: translateY(0) scaleY(1); }
+  }
+  .cta-ripple .section-title {
+    animation: textRipple 2.5s ease-out 1;
+  }
+  .cta-ripple .section-body {
+    animation: textRipple 2.5s ease-out 0.15s 1;
+  }
+  .cta-ripple .btn {
+    animation: textRipple 2.5s ease-out 0.3s 1;
+  }
 </style>
 </head>
 <body>
@@ -304,6 +323,70 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.5;
 renderer.setClearColor(0x000000, 0);
 container.appendChild(renderer.domElement);
+
+/* ═══════════════════════════════════════════════════
+   POST-PROCESSING RIPPLE SHADER
+   ═══════════════════════════════════════════════════ */
+const renderTarget = new THREE.WebGLRenderTarget(
+  window.innerWidth * Math.min(window.devicePixelRatio, 2),
+  window.innerHeight * Math.min(window.devicePixelRatio, 2)
+);
+
+const rippleShaderMat = new THREE.ShaderMaterial({
+  uniforms: {
+    tDiffuse:    { value: null },
+    uTime:       { value: 0.0 },
+    uIntensity:  { value: 0.0 },
+    uCenter:     { value: new THREE.Vector2(0.5, 0.5) },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uTime;
+    uniform float uIntensity;
+    uniform vec2 uCenter;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 uv = vUv;
+      vec2 toCenter = uv - uCenter;
+      float dist = length(toCenter);
+      vec2 dir = normalize(toCenter + 0.0001);
+
+      // Multiple expanding ripple rings
+      float ripple = 0.0;
+      for (float i = 0.0; i < 4.0; i++) {
+        float ringSpeed = 0.35 + i * 0.08;
+        float ringRadius = uTime * ringSpeed;
+        float ringDist = abs(dist - ringRadius);
+        // Sine wave that's strong near the ring and fades away
+        float wave = sin(ringDist * 60.0) * exp(-ringDist * 12.0);
+        // Fade ring as it expands
+        float ringFade = exp(-ringRadius * 1.5);
+        ripple += wave * ringFade;
+      }
+
+      // Displace UV along radial direction
+      uv += dir * ripple * uIntensity * 0.04;
+
+      gl_FragColor = texture2D(tDiffuse, uv);
+    }
+  `,
+  depthTest: false,
+  depthWrite: false,
+});
+
+const quadGeo = new THREE.PlaneGeometry(2, 2);
+const quadMesh = new THREE.Mesh(quadGeo, rippleShaderMat);
+const postScene = new THREE.Scene();
+const postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+postScene.add(quadMesh);
 
 /* ═══════════════════════════════════════════════════
    RIPPLE CANVAS (2D overlay)
@@ -591,12 +674,8 @@ const RIPPLE_INTERVAL  = 0.12; // seconds between successive ring births (tighte
 const SHAKE_AMP        = 0.08; // camera shake amplitude
 const SHAKE_FREQ       = 18;   // camera shake frequency Hz
 
-// Gather all elements that will "ripple" with the strike
-const rippleTargets = [
-  ...document.querySelectorAll('.content-panel'),
-  document.querySelector('nav'),
-  document.getElementById('canvas-container'),
-];
+// Post-process ripple state
+let usePostRipple = false;
 
 // Trigger strike when final section enters view
 ScrollTrigger.create({
@@ -608,6 +687,10 @@ ScrollTrigger.create({
       strikeHasFired = true;
       strikeActive = true;
       strikeTime = 0;
+      usePostRipple = true;
+      // Trigger CSS ripple on CTA text
+      const ctaSection = document.getElementById('start');
+      if (ctaSection) ctaSection.classList.add('cta-ripple');
     }
   }
 });
@@ -897,14 +980,7 @@ function animate() {
   camera.position.y = scrollState.camY;
   camera.lookAt(0, 0, 0);
 
-  /* ── Camera shake from strike vibration ────── */
-  if (strikeActive) {
-    const shakeDecay = Math.exp(-strikeTime * 1.5);
-    const shakeX = Math.sin(strikeTime * SHAKE_FREQ * Math.PI * 2) * SHAKE_AMP * shakeDecay;
-    const shakeY = Math.cos(strikeTime * SHAKE_FREQ * 1.3 * Math.PI * 2) * SHAKE_AMP * 0.6 * shakeDecay;
-    camera.position.x += shakeX;
-    camera.position.y += shakeY;
-  }
+  /* camera shake removed — replaced by post-process ripple */
 
   /* ── Lighting ───────────────────────────────── */
   keyLight.intensity = 1.2 + p * 0.6;
@@ -915,38 +991,39 @@ function animate() {
   /* ── Strike effect ──────────────────────────── */
   if (strikeActive) {
     strikeTime += dt;
-    vibrateProng(dt);
+    /* prong vibration removed — pure visual ripple only */
 
-    // ── Reality-ripple: wave distortion across all DOM elements ──
-    const rippleDecay = Math.exp(-strikeTime * 0.7);
-    const wavePhase = strikeTime * VIBRATION_FREQ * Math.PI * 2;
-
-    rippleTargets.forEach((el, idx) => {
-      if (!el) return;
-      // Each element gets a phase offset — creates cascading wave
-      const phaseOffset = idx * 0.4;
-      const localWave = Math.sin(wavePhase - phaseOffset);
-      const localWave2 = Math.cos(wavePhase * 0.7 - phaseOffset * 1.3);
-
-      const dx = localWave * 8 * rippleDecay;
-      const dy = localWave2 * 5 * rippleDecay;
-      const skewX = localWave * 1.2 * rippleDecay;
-      const scaleWave = 1 + localWave2 * 0.008 * rippleDecay;
-
-      el.style.transform = `translate(${dx}px, ${dy}px) skewX(${skewX}deg) scale(${scaleWave})`;
-    });
+    // ── Post-process ripple is handled via the shader (see below) ──
 
     if (strikeTime > STRIKE_DURATION) {
       strikeActive = false;
       rippleCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-      // Reset all transforms
-      rippleTargets.forEach(el => { if (el) el.style.transform = ''; });
+      usePostRipple = false;
     }
   }
 
-  renderer.render(scene, camera);
+  // Render with post-processing ripple when active
+  if (usePostRipple && strikeActive) {
+    // Update shader uniforms
+    rippleShaderMat.uniforms.uTime.value = strikeTime;
+    const decay = Math.exp(-strikeTime * 0.5);
+    rippleShaderMat.uniforms.uIntensity.value = decay;
+    // Center = fork position on screen (roughly center-top)
+    rippleShaderMat.uniforms.uCenter.value.set(0.5, 0.55);
 
-  // Draw ripples AFTER 3D render (on separate 2D canvas)
+    // Pass 1: render scene to texture
+    renderer.setRenderTarget(renderTarget);
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(null);
+
+    // Pass 2: render ripple-distorted quad to screen
+    rippleShaderMat.uniforms.tDiffuse.value = renderTarget.texture;
+    renderer.render(postScene, postCamera);
+  } else {
+    renderer.render(scene, camera);
+  }
+
+  // Draw 2D ripple rings AFTER 3D render
   drawRipples(dt);
 }
 animate();
@@ -956,6 +1033,8 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  const pr = Math.min(window.devicePixelRatio, 2);
+  renderTarget.setSize(window.innerWidth * pr, window.innerHeight * pr);
   sizeRippleCanvas();
 });
 </script>
