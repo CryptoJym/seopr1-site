@@ -26,6 +26,89 @@
 <meta name="twitter:description" content="AI doesn't rank — it recommends. Tune your firm to the frequency AI listens on.">
 <meta name="twitter:image" content="https://seopr1.com/og-image.png">
 
+<link rel="canonical" href="https://seopr1.com/">
+
+<!-- JSON-LD: Organization -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "@id": "https://seopr1.com/#organization",
+  "name": "SEOPR1",
+  "url": "https://seopr1.com/",
+  "logo": {
+    "@type": "ImageObject",
+    "url": "https://seopr1.com/apple-touch-icon.png",
+    "width": 180,
+    "height": 180
+  },
+  "description": "AI search visibility and automation for professional firms. SEOPR1 tunes your firm's presence so AI assistants cite you by name.",
+  "areaServed": "United States",
+  "knowsAbout": [
+    "Answer Engine Optimization",
+    "AI Visibility",
+    "Generative Engine Optimization",
+    "AI-driven client intake automation",
+    "Schema.org structured data",
+    "Citation share measurement"
+  ],
+  "sameAs": []
+}
+</script>
+
+<!-- JSON-LD: Service -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Service",
+  "@id": "https://seopr1.com/#service",
+  "name": "AI Visibility & Automation for Professional Firms",
+  "serviceType": "Answer Engine Optimization (AEO) and AI-driven client intake automation",
+  "provider": { "@id": "https://seopr1.com/#organization" },
+  "url": "https://seopr1.com/",
+  "description": "Two-part platform tuning a professional firm's web presence so AI assistants like ChatGPT, Gemini, Perplexity, Claude, and Google AI Overviews cite the firm by name — and converting that attention into booked consultations through automated intake, qualification, scheduling, and follow-up.",
+  "audience": {
+    "@type": "BusinessAudience",
+    "audienceType": "Legal, accounting, financial advisory, and consulting firms"
+  },
+  "hasOfferCatalog": {
+    "@type": "OfferCatalog",
+    "name": "SEOPR1 Platform",
+    "itemListElement": [
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "AI Visibility (AV)",
+          "description": "Tune entity signals, schema markup, citation-worthy content, and consistent open-web naming so AI assistants recommend your firm by name."
+        }
+      },
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "AI Automation (AA)",
+          "description": "Automated intake, qualification, scheduling, and follow-up. Sub-90-second response, 24/7 availability, no added headcount."
+        }
+      }
+    ]
+  }
+}
+</script>
+
+<!-- JSON-LD: WebSite -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "@id": "https://seopr1.com/#website",
+  "url": "https://seopr1.com/",
+  "name": "SEOPR1",
+  "publisher": { "@id": "https://seopr1.com/#organization" },
+  "inLanguage": "en-US"
+}
+</script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
@@ -198,6 +281,38 @@
     margin: 0 auto 1.5rem;
   }
 
+  /* Footer */
+  .site-footer {
+    position: relative; z-index: 3;
+    pointer-events: auto;
+    padding: 3rem 6vw 2.5rem;
+    border-top: 1px solid rgba(112, 128, 144, 0.18);
+    background: transparent;
+  }
+  .footer-inner {
+    max-width: 1100px; margin: 0 auto;
+    display: flex; flex-wrap: wrap; gap: 1.5rem 3rem;
+    align-items: baseline; justify-content: space-between;
+  }
+  .footer-brand {
+    font-size: 0.85rem; font-weight: 700;
+    letter-spacing: 0.18em; color: #36454f;
+  }
+  .footer-nav {
+    display: flex; flex-wrap: wrap; gap: 1.75rem;
+  }
+  .footer-nav a {
+    color: #708090; text-decoration: none;
+    font-size: 0.78rem; font-weight: 500;
+    letter-spacing: 0.04em; transition: color 0.2s;
+  }
+  .footer-nav a:hover { color: #36454f; }
+  .footer-meta {
+    font-size: 0.7rem; color: #9aa3a8;
+    letter-spacing: 0.08em; flex-basis: 100%;
+    margin-top: 0.5rem;
+  }
+
   /* Ripple animation for CTA text */
   @keyframes textRipple {
     0%   { transform: translateY(0) scaleY(1); }
@@ -313,6 +428,19 @@
       <a href="https://api.leadconnectorhq.com/widget/booking/gjfNe8wqfqpzE4y1BSC8" target="_blank" rel="noopener" class="btn btn-primary">Schedule a Tuning</a>
     </div>
   </section>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">SEOPR1</div>
+      <nav class="footer-nav" aria-label="Resources">
+        <a href="/answer-engine-optimization">What is AEO?</a>
+        <a href="/ai-visibility-for-firms">AI Visibility for Firms</a>
+        <a href="/faq">FAQ</a>
+        <a href="https://api.leadconnectorhq.com/widget/booking/gjfNe8wqfqpzE4y1BSC8" target="_blank" rel="noopener">Book</a>
+      </nav>
+      <div class="footer-meta">© 2026 SEOPR1 · AI Search Visibility &amp; Automation for Professional Firms</div>
+    </div>
+  </footer>
 
 </div>
 
