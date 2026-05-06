@@ -451,8 +451,11 @@ const renderer  = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.5;
+renderer.toneMappingExposure = 1.15;
+renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.setClearColor(0x000000, 0);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 container.appendChild(renderer.domElement);
 
 /* ═══════════════════════════════════════════════════
@@ -538,63 +541,171 @@ sizeRippleCanvas();
 /* ═══════════════════════════════════════════════════
    LIGHTING
    ═══════════════════════════════════════════════════ */
-scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+scene.add(new THREE.AmbientLight(0xffffff, 0.18));
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
+const keyLight = new THREE.DirectionalLight(0xfff4e6, 1.1);
 keyLight.position.set(3, 7, 5);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.left = -3;
+keyLight.shadow.camera.right = 3;
+keyLight.shadow.camera.top = 5;
+keyLight.shadow.camera.bottom = -5;
+keyLight.shadow.camera.near = 0.5;
+keyLight.shadow.camera.far = 30;
+keyLight.shadow.bias = -0.0002;
+keyLight.shadow.radius = 4;
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xe0e0ee, 0.6);
+const fillLight = new THREE.DirectionalLight(0xc8d4ee, 0.42);
 fillLight.position.set(-5, 3, -3);
 scene.add(fillLight);
 
-const rimLight = new THREE.DirectionalLight(0xffffff, 0.9);
+const rimLight = new THREE.DirectionalLight(0xffffff, 0.85);
 rimLight.position.set(-1, -2, -6);
 scene.add(rimLight);
 
-const topLight = new THREE.DirectionalLight(0xf0f0ff, 0.4);
+const topLight = new THREE.DirectionalLight(0xeaf0ff, 0.32);
 topLight.position.set(0, 12, 0);
 scene.add(topLight);
 
-const frontFill = new THREE.PointLight(0xffffff, 0.3, 20);
+const frontFill = new THREE.PointLight(0xffe8d0, 0.18, 20);
 frontFill.position.set(0, 1, 8);
 scene.add(frontFill);
 
 /* ═══════════════════════════════════════════════════
-   ENVIRONMENT MAP
+   ENVIRONMENT MAP — studio-photography envScene
+   prefiltered through PMREMGenerator so PBR roughness
+   gets proper mip-blurred reflections.
    ═══════════════════════════════════════════════════ */
-const cubeRT     = new THREE.WebGLCubeRenderTarget(512);
-const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRT);
-const envScene   = new THREE.Scene();
+const envScene = new THREE.Scene();
 
+// Sky dome: studio gradient with a subtle horizon line. Top reads as
+// soft daylight, below-horizon darker for an implied floor reflection.
 envScene.add(new THREE.Mesh(
-  new THREE.SphereGeometry(50, 64, 64),
+  new THREE.SphereGeometry(80, 64, 64),
   new THREE.ShaderMaterial({
     side: THREE.BackSide,
     vertexShader: `varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
-    fragmentShader: `varying vec3 vP; void main(){ float y=(normalize(vP).y+1.)*.5; gl_FragColor=vec4(mix(vec3(.06,.06,.08),vec3(.55,.55,.62),y),1.); }`
+    fragmentShader: `
+      varying vec3 vP;
+      void main(){
+        float y = normalize(vP).y;
+        float top = smoothstep(-0.05, 0.55, y);
+        vec3 sky = mix(vec3(0.13, 0.13, 0.16), vec3(0.68, 0.68, 0.74), top);
+        if (y < 0.0) sky = mix(sky, vec3(0.05, 0.05, 0.07), clamp(-y * 1.4, 0.0, 1.0));
+        gl_FragColor = vec4(sky, 1.0);
+      }
+    `,
   })
 ));
 
-[{p:[20,25,12],s:5,c:0xffffff},{p:[-18,8,-20],s:4,c:0xddddee},{p:[0,-12,25],s:3,c:0xeeeeff},{p:[10,0,-10],s:2,c:0xffffff}]
-.forEach(({p,s,c})=>{
-  const m=new THREE.Mesh(new THREE.SphereGeometry(s,16,16),new THREE.MeshBasicMaterial({color:c}));
-  m.position.set(...p); envScene.add(m);
+// Studio softbox panels — bright rectangular sources produce the
+// recognizable elongated highlights that read as "polished metal."
+// Aimed toward origin so the rectangle face is visible in reflection.
+const softboxes = [
+  { pos: [ 11,  13,   8], size: [ 9,  6, 0.4], color: [1.6, 1.55, 1.45] }, // warm key, above-front-right
+  { pos: [ -9,   9,   6], size: [ 7,  5, 0.4], color: [1.05, 1.10, 1.30] }, // cool fill, above-front-left
+  { pos: [  0,  17,   0], size: [ 8,  8, 0.4], color: [1.35, 1.40, 1.55] }, // skylight overhead
+  { pos: [  4,  -2, -10], size: [ 4,  3, 0.4], color: [1.45, 1.05, 0.70] }, // warm rim, behind-below
+];
+softboxes.forEach(({ pos, size, color }) => {
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color().fromArray(color) } },
+    vertexShader: `void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `uniform vec3 uColor; void main(){ gl_FragColor = vec4(uColor, 1.0); }`,
+  });
+  const m = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
+  m.position.set(...pos);
+  m.lookAt(0, 0, 0);
+  envScene.add(m);
 });
 
-cubeCamera.update(renderer, envScene);
+// Scattered subtle spec hits — break up the otherwise empty sky
+for (let i = 0; i < 14; i++) {
+  const ang = (i / 14) * Math.PI * 2 + Math.random() * 0.3;
+  const r = 22 + Math.random() * 18;
+  const y = -10 + Math.random() * 28;
+  const b = 0.55 + Math.random() * 0.5;
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(0.4 + Math.random() * 0.7, 8, 8),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(b, b, b * (0.9 + Math.random() * 0.2)) })
+  );
+  m.position.set(Math.cos(ang) * r, y, Math.sin(ang) * r);
+  envScene.add(m);
+}
+
+const pmremGen = new THREE.PMREMGenerator(renderer);
+pmremGen.compileEquirectangularShader();
+const envTexture = pmremGen.fromScene(envScene, 0.04, 0.1, 200).texture;
+pmremGen.dispose();
+
+// Back-compat shim: existing material declarations reference cubeRT.texture.
+const cubeRT = { texture: envTexture };
 
 /* ═══════════════════════════════════════════════════
    MATERIALS
    ═══════════════════════════════════════════════════ */
-const silverMat = new THREE.MeshStandardMaterial({
-  color: 0xd4d4dc, metalness: 0.96, roughness: 0.06,
-  envMap: cubeRT.texture, envMapIntensity: 1.4,
+// Procedural brushed-metal roughness map: lengthwise micro-scratches +
+// gentle blotches break up reflections so the fork reads as polished
+// instrument steel, not a chrome ball.
+function makeBrushedMetalRoughnessMap() {
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 1024;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#9b9ba0'; // base ~0.6 roughness, modulated by material's roughness slider
+  ctx.fillRect(0, 0, 1024, 1024);
+  ctx.globalAlpha = 0.06;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 6500; i++) {
+    const y = Math.random() * 1024;
+    const x = Math.random() * 1024;
+    const len = 80 + Math.random() * 320;
+    const v = 70 + Math.random() * 90;
+    ctx.strokeStyle = `rgb(${v},${v},${v})`;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke();
+  }
+  ctx.globalAlpha = 0.025;
+  for (let i = 0; i < 280; i++) {
+    const x = Math.random() * 1024;
+    const y = Math.random() * 1024;
+    const r = 6 + Math.random() * 28;
+    const v = 90 + Math.random() * 50;
+    ctx.fillStyle = `rgb(${v|0},${v|0},${v|0})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 6); // stretch lengthwise — brushing direction along the bar
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
+}
+
+const roughnessTex = makeBrushedMetalRoughnessMap();
+
+// Tines + U-bend: highest-polish satin steel with light clearcoat.
+const silverMat = new THREE.MeshPhysicalMaterial({
+  color: 0xe6e6ea,
+  metalness: 0.98,
+  roughness: 0.22,
+  roughnessMap: roughnessTex,
+  envMap: cubeRT.texture,
+  envMapIntensity: 1.05,
+  clearcoat: 0.5,
+  clearcoatRoughness: 0.08,
 });
 
-const gripMat = new THREE.MeshStandardMaterial({
-  color: 0xc8c8d0, metalness: 0.90, roughness: 0.22,
-  envMap: cubeRT.texture, envMapIntensity: 0.9,
+// Grip rings: more matte for tactile contrast against the polished bar.
+const gripMat = new THREE.MeshPhysicalMaterial({
+  color: 0xa8a8ae,
+  metalness: 0.85,
+  roughness: 0.55,
+  roughnessMap: roughnessTex,
+  envMap: cubeRT.texture,
+  envMapIntensity: 0.7,
+  clearcoat: 0.15,
+  clearcoatRoughness: 0.4,
 });
 
 /* ═══════════════════════════════════════════════════
@@ -732,11 +843,26 @@ const collar = new THREE.Mesh(new THREE.TorusGeometry(tubeR+0.06, 0.018, 16, SEG
 collar.position.y = 0.01; collar.rotation.x = Math.PI/2;
 forkGroup.add(collar);
 
+/* ── Cast shadows ─────────────────────────────── */
+forkGroup.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+
 /* ── Center vertically ────────────────────────── */
 const bbox = new THREE.Box3().setFromObject(forkGroup);
 const centerY = (bbox.min.y + bbox.max.y) / 2;
 forkGroup.position.y = -centerY;
 scene.add(forkGroup);
+
+/* ── Contact shadow plane ─────────────────────── */
+// Invisible plane that only renders the shadow falling onto it. Grounds
+// the fork without introducing a visible floor.
+const contactFloor = new THREE.Mesh(
+  new THREE.PlaneGeometry(20, 20),
+  new THREE.ShadowMaterial({ opacity: 0.22 })
+);
+contactFloor.rotation.x = -Math.PI / 2;
+contactFloor.position.y = (bbox.min.y - centerY) - 0.02;
+contactFloor.receiveShadow = true;
+scene.add(contactFloor);
 
 /* ═══════════════════════════════════════════════════
    CAMERA
