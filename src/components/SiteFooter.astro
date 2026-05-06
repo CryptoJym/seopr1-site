@@ -1,0 +1,18 @@
+---
+const BOOKING_URL = 'https://api.leadconnectorhq.com/widget/booking/gjfNe8wqfqpzE4y1BSC8';
+const links = [
+  { href: '/answer-engine-optimization', text: 'What is AEO?' },
+  { href: '/ai-visibility-for-firms', text: 'AI Visibility for Firms' },
+  { href: '/faq', text: 'FAQ' },
+];
+---
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">SEOPR1</div>
+    <nav class="footer-nav" aria-label="Resources">
+      {links.map((l) => <a href={l.href}>{l.text}</a>)}
+      <a href={BOOKING_URL} target="_blank" rel="noopener">Book</a>
+    </nav>
+    <div class="footer-meta">© 2026 SEOPR1 · AI Search Visibility &amp; Automation for Professional Firms</div>
+  </div>
+</footer>
