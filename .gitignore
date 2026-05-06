@@ -1,8 +1,5 @@
 node_modules/
 .vercel/
 .DS_Store
-b64.txt
-build.py
 *.log
-.vercel
 .env*.local
