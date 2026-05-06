@@ -1,0 +1,19 @@
+{
+  "name": "seopr1-site",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "astro": "^6.2.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
