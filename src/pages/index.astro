@@ -114,7 +114,7 @@ import SiteFooter from '../components/SiteFooter.astro';
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
 
 <script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
@@ -123,11 +123,17 @@ import SiteFooter from '../components/SiteFooter.astro';
 <style>
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-  :root { --font: 'Inter', system-ui, -apple-system, sans-serif; }
+  :root {
+    --font-body:    'Inter Tight', system-ui, -apple-system, sans-serif;
+    --font-display: 'Bricolage Grotesque', 'Inter Tight', system-ui, sans-serif;
+    --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    /* legacy alias for any straggler references */
+    --font: var(--font-body);
+  }
   html { scroll-behavior: auto; }
 
   body {
-    font-family: var(--font);
+    font-family: var(--font-body);
     background: #ffffff;
     color: #111111;
     overflow-x: hidden;
@@ -184,25 +190,32 @@ import SiteFooter from '../components/SiteFooter.astro';
   .align-center .content-panel { margin: 0 auto; text-align: center; max-width: 640px; }
 
   .hero-tag {
-    font-size: 0.68rem; font-weight: 500;
-    letter-spacing: 0.4em; text-transform: uppercase;
+    font-family: var(--font-mono);
+    font-size: 0.7rem; font-weight: 500;
+    letter-spacing: 0.22em; text-transform: uppercase;
     color: #708090; margin-bottom: 1.5rem;
   }
   .hero-title {
+    font-family: var(--font-display);
     font-size: clamp(2.8rem, 5.5vw, 5rem);
-    font-weight: 700; line-height: 1.05;
-    letter-spacing: -0.02em;
+    font-weight: 600; line-height: 1.02;
+    letter-spacing: -0.025em;
+    font-variation-settings: "opsz" 96;
     margin-bottom: 1.5rem; color: #36454f;
   }
   .section-tag {
-    font-size: 0.62rem; font-weight: 500;
-    letter-spacing: 0.35em; text-transform: uppercase;
+    font-family: var(--font-mono);
+    font-size: 0.66rem; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase;
     color: #708090; margin-bottom: 0.75rem;
   }
   .section-title {
+    font-family: var(--font-display);
     font-size: clamp(1.6rem, 3vw, 2.6rem);
-    font-weight: 600; line-height: 1.15; margin-bottom: 1rem;
-    letter-spacing: -0.01em; color: #36454f;
+    font-weight: 600; line-height: 1.1; margin-bottom: 1rem;
+    letter-spacing: -0.015em;
+    font-variation-settings: "opsz" 48;
+    color: #36454f;
   }
   .section-body {
     font-size: 1rem; font-weight: 300;
@@ -230,11 +243,17 @@ import SiteFooter from '../components/SiteFooter.astro';
   }
 
   .stat-row { display: flex; gap: 2.5rem; margin-top: 1.5rem; }
-  .stat-value { font-size: 1.8rem; font-weight: 700; color: #708090; }
+  .stat-value {
+    font-family: var(--font-mono);
+    font-size: 1.7rem; font-weight: 600;
+    color: #36454f; letter-spacing: -0.02em;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
   .stat-label {
+    font-family: var(--font-mono);
     font-size: 0.62rem; font-weight: 500; color: #708090;
-    text-transform: uppercase; letter-spacing: 0.12em;
-    opacity: 0.7;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    opacity: 0.85;
   }
 
   body > nav {
@@ -244,13 +263,16 @@ import SiteFooter from '../components/SiteFooter.astro';
     backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   }
   .nav-logo {
-    font-size: 0.9rem; font-weight: 700;
-    letter-spacing: 0.18em; color: #36454f; text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 0.85rem; font-weight: 600;
+    letter-spacing: 0.16em; color: #36454f; text-decoration: none;
   }
   .nav-links { display: flex; gap: 2rem; list-style: none; }
   .nav-links a {
+    font-family: var(--font-mono);
     color: #708090; text-decoration: none;
-    font-size: 0.78rem; font-weight: 500; letter-spacing: 0.04em; transition: color 0.2s;
+    font-size: 0.74rem; font-weight: 500; letter-spacing: 0.04em;
+    transition: color 0.2s;
   }
   .nav-links a:hover { color: #36454f; }
 
@@ -262,7 +284,8 @@ import SiteFooter from '../components/SiteFooter.astro';
   }
   .scroll-hint.hidden { opacity: 0; pointer-events: none; }
   .scroll-hint span {
-    font-size: 0.65rem; letter-spacing: 0.25em;
+    font-family: var(--font-mono);
+    font-size: 0.62rem; letter-spacing: 0.16em;
     text-transform: uppercase; color: #aaaaaa; font-weight: 500;
   }
   .scroll-arrow {
