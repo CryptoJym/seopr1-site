@@ -951,7 +951,13 @@ ScrollTrigger.create({
       strikeTime = 0;
       usePostRipple = true;
       // Apply SVG ripple filter to all visible DOM content
-      document.querySelectorAll('.content-panel, nav, .scroll-hint, .progress-bar').forEach(el => {
+      // Target children of .content-panel — NOT the panel itself.
+      // The panel is GSAP-animated (translateY 60px -> 0 on scroll reveal).
+      // Overriding its transform here would clobber GSAP's value, then on
+      // cleanup the inline transform gets cleared and the panel snaps back
+      // to its CSS-initial translateY(60px). Wiggling the children
+      // preserves the visual effect without fighting the scroll reveal.
+      document.querySelectorAll('.content-panel > *, nav, .scroll-hint, .progress-bar').forEach(el => {
         el.style.filter = 'url(#dom-ripple)';
         el.style.willChange = 'filter';
         domRippleEls.push(el);
