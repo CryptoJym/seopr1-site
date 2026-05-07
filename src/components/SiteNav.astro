@@ -1,0 +1,14 @@
+---
+const links = [
+  { href: '/answer-engine-optimization', text: 'AEO' },
+  { href: '/ai-visibility-for-firms', text: 'For Firms' },
+  { href: '/faq', text: 'FAQ' },
+  { href: '/#start', text: 'Get Tuned' },
+];
+---
+<header class="site-nav">
+  <a href="/" class="brand">SEOPR1</a>
+  <ul>
+    {links.map((l) => <li><a href={l.href}>{l.text}</a></li>)}
+  </ul>
+</header>

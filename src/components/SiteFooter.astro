@@ -1,0 +1,67 @@
+---
+const BOOKING_URL = 'https://api.leadconnectorhq.com/widget/booking/gjfNe8wqfqpzE4y1BSC8';
+const links = [
+  { href: '/answer-engine-optimization', text: 'What is AEO?' },
+  { href: '/ai-visibility-for-firms', text: 'AI Visibility for Firms' },
+  { href: '/faq', text: 'FAQ' },
+];
+---
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">SEOPR1</div>
+    <nav class="footer-nav" aria-label="Resources">
+      {links.map((l) => <a href={l.href}>{l.text}</a>)}
+      <a href={BOOKING_URL} target="_blank" rel="noopener">Book</a>
+    </nav>
+    <div class="footer-meta">© 2026 SEOPR1 · AI Search Visibility &amp; Automation for Professional Firms</div>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    position: relative;
+    z-index: 3;
+    pointer-events: auto;
+    padding: 3rem 6vw 2.5rem;
+    border-top: 1px solid rgba(112, 128, 144, 0.18);
+    background: transparent;
+  }
+  .footer-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem 3rem;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .footer-brand {
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: #36454f;
+  }
+  .footer-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.75rem;
+    /* defensive: cancel any inherited fixed positioning from a parent's <nav> rule */
+    position: static;
+  }
+  .footer-nav a {
+    color: #708090;
+    text-decoration: none;
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    transition: color 0.2s;
+  }
+  .footer-nav a:hover { color: #36454f; }
+  .footer-meta {
+    font-size: 0.7rem;
+    color: #9aa3a8;
+    letter-spacing: 0.08em;
+    flex-basis: 100%;
+    margin-top: 0.5rem;
+  }
+</style>
