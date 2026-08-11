@@ -116,10 +116,12 @@ import SiteFooter from '../components/SiteFooter.astro';
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
 
-<script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-<script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
-<script is:inline src="/assets/lenis.min.js"></script>
+<!-- All runtime libraries are self-hosted (versioned filenames + immutable
+     caching): no third-party script origins, so the CSP allows 'self' only. -->
+<script is:inline src="/assets/three-r128.min.js"></script>
+<script is:inline src="/assets/gsap-3.12.2.min.js"></script>
+<script is:inline src="/assets/ScrollTrigger-3.12.2.min.js"></script>
+<script is:inline src="/assets/lenis-1.3.11.min.js"></script>
 
 <!-- Arm enhancement classes before first paint. If a CDN fails, the page
      stays fully readable in its static light form (no hidden panels). -->
@@ -447,6 +449,27 @@ import SiteFooter from '../components/SiteFooter.astro';
     50% { transform: rotate(45deg) translateY(5px); }
   }
 
+  /* Keyboard strike — sr-only-until-focus */
+  .strike-btn { display: none; }
+  html.strike-ready .strike-btn {
+    display: block;
+    position: fixed; left: 50%; bottom: 5.2rem; transform: translateX(-50%);
+    z-index: 95;
+    width: 1px; height: 1px; overflow: hidden; white-space: nowrap;
+    clip-path: inset(50%);
+    font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink); background: transparent;
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 0; cursor: pointer;
+  }
+  html.strike-ready .strike-btn:focus-visible {
+    width: auto; height: auto; overflow: visible;
+    clip-path: none;
+    padding: 0.55rem 1.15rem;
+    outline: 2px solid var(--ink); outline-offset: 3px;
+  }
+
   .progress-bar {
     position: fixed; top: 0; left: 0; height: 1.5px;
     background: var(--ink);
@@ -572,6 +595,9 @@ import SiteFooter from '../components/SiteFooter.astro';
     .nav-links { gap: 1.1rem; }
     .nav-links li:not(:last-child) { display: none; }
 
+    /* Thumbs already know how to scroll; the hint just crowds the tuner. */
+    .scroll-hint { display: none; }
+
     #wave-canvas { display: none; }
     .hud { bottom: 1.6rem; }
 
@@ -619,6 +645,10 @@ import SiteFooter from '../components/SiteFooter.astro';
   <span>Scroll to explore</span>
   <div class="scroll-arrow"></div>
 </div>
+
+<!-- Keyboard path to the page's signature interaction. Appears in the tab
+     order only when the 3D instrument is ready; visible only while focused. -->
+<button id="strikeBtn" class="strike-btn" aria-label="Strike the tuning fork">Strike the tuning fork</button>
 
 <div class="hud" id="hud" aria-hidden="true">
   <span class="hud-pitch">A4</span>
@@ -781,9 +811,12 @@ const themePairs = {
   '--faint':  [[154, 163, 168], [139, 147, 156]],
   '--btn-bg': [[54, 69, 79],    [244, 246, 248]],
   '--btn-tx': [[255, 255, 255], [30, 39, 46]],
-  '--spot':   [[255, 255, 255], [24, 28, 33]],
-  '--edge':   [[236, 238, 240], [5, 6, 8]],
 };
+// The room itself dusks on a softer curve than the type (which must flip
+// early for contrast): one extra smoothstep = evening settling in, not a
+// dimmer being dragged.
+const SPOT = [[255, 255, 255], [24, 28, 33]];
+const EDGE = [[236, 238, 240], [5, 6, 8]];
 const lerpC = (a, b, t) => `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`;
 
 const ringField = document.getElementById('ring-field');
@@ -803,13 +836,17 @@ function applyTheme(p) {
   s.setProperty('--tp', t.toFixed(4));
   for (const k in themePairs) s.setProperty(k, lerpC(themePairs[k][0], themePairs[k][1], t));
   themeMuted = lerpC(themePairs['--muted'][0], themePairs['--muted'][1], t);
+
+  const dusk = t * t * (3 - 2 * t);
+  s.setProperty('--spot', lerpC(SPOT[0], SPOT[1], dusk));
+  s.setProperty('--edge', lerpC(EDGE[0], EDGE[1], dusk));
   s.setProperty('--line', `rgba(${t < 0.5 ? '54,69,79' : '244,246,248'},${(0.22 + t * 0.02).toFixed(3)})`);
   s.setProperty('--ghost-stroke', `rgba(${t < 0.5 ? '54,69,79' : '255,255,255'},${(0.15 - t * 0.05).toFixed(3)})`);
   s.setProperty('--scrim-rgb', t < 0.5 ? '250,251,252' : '12,15,19');
   s.setProperty('--cta-glow-a', (Math.max(0, p - 0.6) / 0.4 * 0.5).toFixed(3));
 
-  // Base plate under the studio backdrop.
-  const bg = Math.round(255 * (1 - p));
+  // Base plate under the studio backdrop — follows the same dusk curve.
+  const bg = Math.round(255 * (1 - dusk));
   bgOverlay.style.background = `rgb(${bg},${bg},${Math.min(255, bg + 2)})`;
 
   // Standing-wave field: silent at the poles, present through the journey,
@@ -975,6 +1012,9 @@ sizeWave();
 let smoothVel = 0;
 let waveInk = 'rgb(112,128,144)';
 let lastScrollY = window.scrollY;
+let hudTick = 0;
+let lastHzText = '';
+let lastStateText = '';
 
 function drawWave(time, p, strikeEnv) {
   if (!waveCtx) return;
@@ -1014,11 +1054,19 @@ function updateHud(time, p, strikeEnv, striking) {
   // this page only ever tunes UP.
   const wander = REDUCED ? 0 : Math.sin(time * 0.9) * 0.6 * (1 - p) + Math.sin(time * 2.3) * 0.25 * (1 - p);
   const hz = Math.max(415.3, 415.3 + 24.7 * p + wander);
-  hudHz.textContent = hz.toFixed(2) + ' Hz';
+
+  // Text nodes update ~10×/sec (imperceptible for a tuner readout, kinder
+  // to layout); the canvas waveform below stays at full frame rate.
+  hudTick++;
+  if (hudTick % 6 === 1) {
+    const hzText = hz.toFixed(2) + ' Hz';
+    if (hzText !== lastHzText) { hudHz.textContent = hzText; lastHzText = hzText; }
+  }
 
   const inTune = p > 0.965;
   hud.classList.toggle('in-tune', inTune);
-  hudState.textContent = striking ? 'Ringing' : (inTune ? 'In tune' : 'Flat');
+  const stateText = striking ? 'Ringing' : (inTune ? 'In tune' : 'Flat');
+  if (stateText !== lastStateText) { hudState.textContent = stateText; lastStateText = stateText; }
 
   if (!REDUCED) drawWave(time, p, strikeEnv);
 }
@@ -1522,6 +1570,17 @@ if (!REDUCED && !COARSE) {
 }
 
 let lastStrikeAt = -10;
+
+// Keyboard/AT path to the strike — same cooldown as the pointer path.
+const strikeBtn = document.getElementById('strikeBtn');
+if (strikeBtn && !REDUCED) {
+  docEl.classList.add('strike-ready');
+  strikeBtn.addEventListener('click', () => {
+    const now = performance.now() / 1000;
+    if (now - lastStrikeAt > 2.2) fireStrike();
+  });
+}
+
 window.addEventListener('pointerdown', (e) => {
   if (REDUCED) return;
   if (e.target.closest('a, button, nav, .content-panel, footer')) return;
@@ -1825,7 +1884,10 @@ function vibrateProng() {
   }
 
   positions.needsUpdate = true;
-  tubeGeo.computeVertexNormals();
+  // Rest-pose normals are kept during the shiver: at ≤0.12 units of lateral
+  // displacement the lighting difference is invisible, and skipping the
+  // full-geometry normals pass keeps the strike smooth on weak machines.
+  // (Normals are recomputed once in the restore branch above.)
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1861,13 +1923,15 @@ function animate() {
   updateHud(now, p, strikeEnvSmoothed, strikeActive && strikeTime < 3.2);
   waveInk = themeMuted;
 
-  /* ── Silver adapts: brighter, cleaner metal as the room darkens ── */
-  const b = 0.9 + p * 0.06;
+  /* ── Silver adapts: brushed steel in daylight, brighter as the room
+     darkens. Light-end reflection is held back a touch so the metal
+     reads as steel, not porcelain, on the white ground. ── */
+  const b = 0.88 + p * 0.08;
   silverMat.color.setRGB(b, b, b + 0.015);
-  silverMat.roughness = 0.24 - p * 0.09;
-  silverMat.envMapIntensity = 1.15 + p * 0.75;
+  silverMat.roughness = 0.26 - p * 0.11;
+  silverMat.envMapIntensity = 1.0 + p * 0.9;
   gripMat.color.setRGB(b - 0.05, b - 0.05, b - 0.03);
-  gripMat.envMapIntensity = 0.8 + p * 0.4;
+  gripMat.envMapIntensity = 0.72 + p * 0.48;
 
   /* ── Fork pose: scroll choreography + breath + pointer lean ── */
   pointer.x += (pointer.tx - pointer.x) * 0.055;
