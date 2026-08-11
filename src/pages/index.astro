@@ -19,7 +19,7 @@ import SiteFooter from '../components/SiteFooter.astro';
 <meta property="og:url" content="https://seopr1.com/">
 <meta property="og:title" content="SEOPR1 — AI Search Visibility &amp; Automation">
 <meta property="og:description" content="AI doesn't rank — it recommends. Tune your firm to the frequency AI listens on.">
-<meta property="og:image" content="https://seopr1.com/og-image.png">
+<meta property="og:image" content="https://seopr1.com/og-image.png?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 
@@ -27,7 +27,7 @@ import SiteFooter from '../components/SiteFooter.astro';
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="SEOPR1 — AI Search Visibility &amp; Automation">
 <meta name="twitter:description" content="AI doesn't rank — it recommends. Tune your firm to the frequency AI listens on.">
-<meta name="twitter:image" content="https://seopr1.com/og-image.png">
+<meta name="twitter:image" content="https://seopr1.com/og-image.png?v=2">
 
 <link rel="canonical" href="https://seopr1.com/">
 
@@ -193,7 +193,7 @@ import SiteFooter from '../components/SiteFooter.astro';
     width: 100%; height: 100vh; height: 100dvh;
     z-index: 0;
     opacity: 0;
-    background: repeating-radial-gradient(circle at 50% 42%,
+    background: repeating-radial-gradient(circle at var(--ring-x, 50%) var(--ring-y, 42%),
       transparent 0 74px,
       var(--ring-c, rgba(120,130,142,0.05)) 74px 75px,
       transparent 75px 150px);
@@ -880,6 +880,8 @@ const countUp = (el) => {
   });
 };
 
+let ctaRevealTl = null; // the finale's reveal — the strike waits for it
+
 document.querySelectorAll('.content-panel').forEach((panel) => {
   const section = panel.closest('.content-section');
   const lines = panel.querySelectorAll('.tl-i');
@@ -888,6 +890,7 @@ document.querySelectorAll('.content-panel').forEach((panel) => {
   if (REDUCED) return; // CSS already forces visible states
 
   const tl = gsap.timeline({ paused: true });
+  if (section.id === 'start') ctaRevealTl = tl;
   tl.to(lines, { y: 0, duration: 0.9, ease: 'power4.out', stagger: 0.09 }, 0)
     .to(rvs, { opacity: 1, y: 0, duration: 0.7, ease: 'power3.out', stagger: 0.07 }, 0.12);
 
@@ -1006,9 +1009,11 @@ function drawWave(time, p, strikeEnv) {
 }
 
 function updateHud(time, p, strikeEnv, striking) {
-  // 415.30 Hz (A♭4) → 440.00 Hz (A4, concert pitch)
+  // 415.30 Hz (A♭4) → 440.00 Hz (A4, concert pitch).
+  // The needle may hesitate but never dips below where it started:
+  // this page only ever tunes UP.
   const wander = REDUCED ? 0 : Math.sin(time * 0.9) * 0.6 * (1 - p) + Math.sin(time * 2.3) * 0.25 * (1 - p);
-  const hz = 415.3 + 24.7 * p + wander;
+  const hz = Math.max(415.3, 415.3 + 24.7 * p + wander);
   hudHz.textContent = hz.toFixed(2) + ' Hz';
 
   const inTune = p > 0.965;
@@ -1568,13 +1573,27 @@ function fireStrike() {
   }
 }
 
-// The crescendo: the room is dark, the instrument faces you, and as the
-// final section arrives the fork is struck.
+// The crescendo: the room is dark, the instrument faces you, the final
+// words land — then one held breath of silence, and the strike.
+// (A crescendo needs the rest before the downbeat.)
+let autoStruck = false;
+let pendingStrike = null;
 ScrollTrigger.create({
   trigger: '#start',
   start: 'top 60%',
-  once: true,
-  onEnter: () => { if (!REDUCED) fireStrike(); },
+  onEnter: () => {
+    if (REDUCED || autoStruck || pendingStrike) return;
+    const remaining = ctaRevealTl ? Math.max(0, ctaRevealTl.duration() - ctaRevealTl.time()) : 0;
+    pendingStrike = gsap.delayedCall(remaining + 0.45, () => {
+      autoStruck = true;
+      pendingStrike = null;
+      fireStrike();
+    });
+  },
+  // Scrolled back out before the beat landed: cancel, re-arm on next entry.
+  onLeaveBack: () => {
+    if (pendingStrike) { pendingStrike.kill(); pendingStrike = null; }
+  },
 });
 
 /* ── Project 3D point to 2D screen coords ─────── */
@@ -1815,6 +1834,8 @@ function vibrateProng() {
 const ctaBtn = document.getElementById('ctaBtn');
 let lastTime = performance.now();
 let strikeEnvSmoothed = 0;
+let frameN = 0;
+let ringX = 50, ringY = 42;
 
 function animate() {
   requestAnimationFrame(animate);
@@ -1864,6 +1885,22 @@ function animate() {
   camera.position.y = scrollState.camY - pointer.y * 0.16;
   camera.lookAt(0, 0, 0);
 
+  /* ── Standing-wave field stays anchored to the instrument ───────── */
+  // The room's rings should radiate from the thing that makes the sound.
+  frameN++;
+  if (frameN % 5 === 0) {
+    const [rt1, rt2] = getProngTipWorldPositions();
+    const rs1 = projectToScreen(rt1);
+    const rs2 = projectToScreen(rt2);
+    const rx = Math.min(80, Math.max(20, ((rs1.x + rs2.x) / 2 / window.innerWidth) * 100));
+    const ry = Math.min(70, Math.max(8, ((rs1.y + rs2.y) / 2 / window.innerHeight) * 100));
+    if (Math.abs(rx - ringX) > 0.4 || Math.abs(ry - ringY) > 0.4) {
+      ringX = rx; ringY = ry;
+      ringField.style.setProperty('--ring-x', rx.toFixed(1) + '%');
+      ringField.style.setProperty('--ring-y', ry.toFixed(1) + '%');
+    }
+  }
+
   /* ── Lighting: the darker the room, the more the metal is rimmed ── */
   keyLight.intensity = 1.15 + p * 0.5;
   rimLight.intensity = 0.7 + p * 1.0;
@@ -1887,8 +1924,10 @@ function animate() {
       const forkCX = (sL.x + sR.x) / 2;
       const forkCY = (sL.y + sR.y) / 2;
 
-      // Animate global turbulence frequency for organic wave motion
-      const globalDecay = Math.exp(-strikeTime * 0.6);
+      // Animate global turbulence frequency for organic wave motion.
+      // Decay is brisk on purpose: the type may shiver, never break —
+      // the shockwave lives in the rings and the canvas, not the words.
+      const globalDecay = Math.exp(-strikeTime * 1.0);
       const freqBase = 0.012 + Math.sin(strikeTime * 1.8) * 0.008 * globalDecay;
       const freqY = freqBase * 0.55;
       domTurb.setAttribute('baseFrequency', `${freqBase.toFixed(4)} ${freqY.toFixed(4)}`);
@@ -1906,17 +1945,17 @@ function animate() {
 
         const distFromWavefront = Math.abs(dist - wavefrontRadius);
         const bandInfluence = Math.max(0, 1 - distFromWavefront / wavefrontWidth);
-        const elDecay = Math.exp(-strikeTime * 0.5);
+        const elDecay = Math.exp(-strikeTime * 1.1);
 
         const ripplePhase = Math.sin((dist * 0.008) - strikeTime * 4) * bandInfluence * elDecay;
-        const tx = ripplePhase * 3;
-        const ty = ripplePhase * 1.5;
+        const tx = ripplePhase * 2;
+        const ty = ripplePhase * 1;
         el.style.transform = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px)`;
         el.style.transition = 'none';
       });
 
       // Set shared filter displacement to the max active level
-      const peakScale = globalDecay * 30;
+      const peakScale = globalDecay * 18;
       domDisplace.setAttribute('scale', peakScale.toFixed(2));
     }
 
