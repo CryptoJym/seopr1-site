@@ -45,7 +45,7 @@ import SiteFooter from '../components/SiteFooter.astro';
     "width": 180,
     "height": 180
   },
-  "description": "AI search visibility and automation for professional firms. SEOPR1 tunes your firm's presence so AI assistants cite you by name.",
+  "description": "AI search visibility and automation for professional firms. SEOPR1 tunes your firm's presence so AI assistants cite your firm by name.",
   "areaServed": "United States",
   "knowsAbout": [
     "Answer Engine Optimization",
@@ -119,6 +119,19 @@ import SiteFooter from '../components/SiteFooter.astro';
 <script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 <script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+<script is:inline src="/assets/lenis.min.js"></script>
+
+<!-- Arm enhancement classes before first paint. If a CDN fails, the page
+     stays fully readable in its static light form (no hidden panels). -->
+<script is:inline>
+(function () {
+  var d = document.documentElement;
+  if (window.THREE && window.gsap && window.ScrollTrigger) {
+    d.classList.add('fx');
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) d.classList.add('fx-motion');
+  }
+})();
+</script>
 
 <style>
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -129,7 +142,25 @@ import SiteFooter from '../components/SiteFooter.astro';
     --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
     /* legacy alias for any straggler references */
     --font: var(--font-body);
+
+    /* ── Scroll-driven theme (JS writes these once per frame) ─────────
+       Every color on the page derives from this set, so the whole DOM
+       re-tunes in lockstep with the 3D environment — including pieces
+       (stat labels, hud, rules) that previously fell out of sync. */
+    --tp: 0;                              /* eased theme progress 0..1 */
+    --ink:    #36454f;                    /* headings / strong text    */
+    --muted:  #708090;                    /* body / labels             */
+    --faint:  #9aa3a8;                    /* metadata / hints          */
+    --line:   rgba(54,69,79,0.22);        /* hairlines                 */
+    --btn-bg: #36454f;
+    --btn-tx: #ffffff;
+    --ghost-stroke: rgba(54,69,79,0.16);  /* oversized numerals        */
+    --scrim-rgb: 255,255,255;             /* mobile legibility plate   */
+    --cta-glow-a: 0;                      /* finale glow under CTA     */
+    --spot: #ffffff;                      /* studio backdrop center    */
+    --edge: #eceef0;                      /* studio backdrop vignette  */
   }
+
   html { scroll-behavior: auto; }
 
   body {
@@ -142,20 +173,65 @@ import SiteFooter from '../components/SiteFooter.astro';
 
   #bg-overlay {
     position: fixed; top: 0; left: 0;
-    width: 100%; height: 100vh;
+    width: 100%; height: 100vh; height: 100dvh;
     background: #ffffff; z-index: 0;
+  }
+
+  /* Soft studio backdrop — a lit cyclorama behind the instrument instead
+     of a flat color field. Center spot + vignette follow the theme. */
+  #studio-backdrop {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100vh; height: 100dvh;
+    z-index: 0;
+    background: radial-gradient(120% 95% at 50% 40%, var(--spot) 0%, var(--edge) 78%);
+  }
+
+  /* Standing-wave field — ultra-faint concentric rings that give the
+     mid-journey air some structure and tie the room to the fork. */
+  #ring-field {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100vh; height: 100dvh;
+    z-index: 0;
+    opacity: 0;
+    background: repeating-radial-gradient(circle at 50% 42%,
+      transparent 0 74px,
+      var(--ring-c, rgba(120,130,142,0.05)) 74px 75px,
+      transparent 75px 150px);
+    transform: scale(1);
+    will-change: opacity, transform;
+    pointer-events: none;
   }
 
   #canvas-container {
     position: fixed; top: 0; left: 0;
-    width: 100%; height: 100vh; z-index: 1;
+    width: 100%; height: 100vh; height: 100dvh;
+    z-index: 1;
   }
   canvas { display: block; }
+
+  /* Film grain — kills the flat digital gray; generated at runtime. */
+  #grain {
+    position: fixed; top: -60px; left: -60px;
+    width: calc(100% + 120px); height: calc(100vh + 120px); height: calc(100dvh + 120px);
+    z-index: 60;
+    opacity: calc(0.028 + var(--tp) * 0.022);
+    pointer-events: none;
+    background-repeat: repeat;
+  }
+  .fx-motion #grain { animation: grainShift 1.1s steps(5) infinite; }
+  @keyframes grainShift {
+    0%   { transform: translate(0, 0); }
+    20%  { transform: translate(-28px, 14px); }
+    40%  { transform: translate(16px, -22px); }
+    60%  { transform: translate(-12px, -30px); }
+    80%  { transform: translate(30px, 8px); }
+    100% { transform: translate(0, 0); }
+  }
 
   /* Ripple overlay — sits on top of everything */
   #ripple-canvas {
     position: fixed; top: 0; left: 0;
-    width: 100%; height: 100vh;
+    width: 100%; height: 100vh; height: 100dvh;
     z-index: 150;
     pointer-events: none;
   }
@@ -167,33 +243,59 @@ import SiteFooter from '../components/SiteFooter.astro';
 
   .content-section {
     position: relative; z-index: 3;
-    pointer-events: auto;
-    min-height: 100vh;
+    pointer-events: none; /* let clicks fall through to the instrument */
+    min-height: 100vh; min-height: 100dvh;
     display: flex; align-items: center;
     padding: 4rem 6vw;
   }
 
   .content-section:last-child {
-    min-height: 100vh;
+    min-height: 100vh; min-height: 100dvh;
     margin-bottom: 0;
     padding-bottom: 4rem;
   }
 
   .content-panel {
+    position: relative;
     max-width: 520px;
-    opacity: 0;
-    transform: translateY(60px);
+    pointer-events: auto;
   }
 
   .align-left  .content-panel { margin-right: auto; }
   .align-right .content-panel { margin-left: auto; }
   .align-center .content-panel { margin: 0 auto; text-align: center; max-width: 640px; }
 
+  /* ── Oversized ghost numerals — depth + editorial rhythm ─────────── */
+  .ghost-num {
+    position: absolute;
+    top: 50%; transform: translateY(-50%);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(14rem, 30vw, 26rem);
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: transparent;
+    -webkit-text-stroke: 1.5px var(--ghost-stroke);
+    user-select: none;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .align-right .ghost-num { left: 2vw; }
+  .align-left  .ghost-num { right: 2vw; }
+
+  /* ── Reveal machinery ────────────────────────────────────────────── */
+  /* Static-first: everything is visible by default. Only when the fx
+     class is armed do initial hidden states apply (JS then animates). */
+  .tl { display: block; overflow: hidden; }
+  .tl-i { display: block; }
+  html.fx .tl-i { transform: translateY(112%); }
+  html.fx .rv { opacity: 0; transform: translateY(18px); }
+
   .hero-tag {
     font-family: var(--font-mono);
     font-size: 0.7rem; font-weight: 500;
     letter-spacing: 0.22em; text-transform: uppercase;
-    color: #708090; margin-bottom: 1.5rem;
+    color: var(--muted); margin-bottom: 1.5rem;
   }
   .hero-title {
     font-family: var(--font-display);
@@ -201,13 +303,13 @@ import SiteFooter from '../components/SiteFooter.astro';
     font-weight: 600; line-height: 1.02;
     letter-spacing: -0.025em;
     font-variation-settings: "opsz" 96;
-    margin-bottom: 1.5rem; color: #36454f;
+    margin-bottom: 1.5rem; color: var(--ink);
   }
   .section-tag {
     font-family: var(--font-mono);
     font-size: 0.66rem; font-weight: 500;
     letter-spacing: 0.18em; text-transform: uppercase;
-    color: #708090; margin-bottom: 0.75rem;
+    color: var(--muted); margin-bottom: 0.75rem;
   }
   .section-title {
     font-family: var(--font-display);
@@ -215,43 +317,72 @@ import SiteFooter from '../components/SiteFooter.astro';
     font-weight: 600; line-height: 1.1; margin-bottom: 1rem;
     letter-spacing: -0.015em;
     font-variation-settings: "opsz" 48;
-    color: #36454f;
+    color: var(--ink);
   }
   .section-body {
     font-size: 1rem; font-weight: 300;
-    line-height: 1.7; color: #708090; margin-bottom: 1.5rem;
+    line-height: 1.7; color: var(--muted); margin-bottom: 1.5rem;
   }
-
-  /* Colors are now driven continuously by JS — no binary toggle */
 
   .btn {
     display: inline-block; padding: 0.9rem 2.2rem;
     border-radius: 999px; font-size: 0.88rem; font-weight: 600;
     text-decoration: none; cursor: pointer;
-    transition: transform 0.25s, box-shadow 0.25s, background 0.3s;
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.3s, background 0.3s, color 0.3s, border-color 0.3s;
     pointer-events: auto;
   }
   .btn:hover { transform: translateY(-2px); }
-  .btn-primary {
-    background: #36454f; color: #ffffff; border: none;
-    box-shadow: 0 4px 20px rgba(54,69,79,0.2);
+  .btn:active { transform: translateY(0); transition-duration: 0.12s; }
+  .btn:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
   }
-  .btn-primary:hover { box-shadow: 0 8px 30px rgba(54,69,79,0.3); }
+  .btn-primary {
+    background: var(--btn-bg); color: var(--btn-tx); border: none;
+    box-shadow: 0 4px 20px rgba(20, 26, 31, 0.18);
+  }
+  .btn-primary:hover { box-shadow: 0 10px 34px rgba(20, 26, 31, 0.28); }
   .btn-ghost {
-    background: transparent; color: #36454f;
-    border: 1.5px solid #d3d3d3; margin-left: 0.75rem;
+    background: transparent; color: var(--ink);
+    border: 1.5px solid var(--line); margin-left: 0.75rem;
+  }
+  .btn-ghost:hover { border-color: var(--ink); }
+
+  /* Finale: the primary CTA keeps ringing after the strike. */
+  .btn-primary.ringing { animation: ctaRing 3.2s ease-out infinite; }
+  @keyframes ctaRing {
+    0%   { box-shadow: 0 10px 34px rgba(20,26,31,0.28), 0 0 0 0 rgba(235,240,248,0.34); }
+    60%  { box-shadow: 0 10px 34px rgba(20,26,31,0.28), 0 0 0 22px rgba(235,240,248,0); }
+    100% { box-shadow: 0 10px 34px rgba(20,26,31,0.28), 0 0 0 0 rgba(235,240,248,0); }
   }
 
-  .stat-row { display: flex; gap: 2.5rem; margin-top: 1.5rem; }
+  .stat-row { display: flex; gap: 2.5rem; margin-top: 1.75rem; }
+  .stat-row > div {
+    position: relative;
+    padding-top: 0.85rem;
+  }
+  .stat-row > div::before {
+    content: "";
+    position: absolute; top: 0; left: 0;
+    width: 2.2rem; height: 1px;
+    background: var(--line);
+    transform-origin: left center;
+  }
+  html.fx .stat-row > div::before { transform: scaleX(0); }
+  html.fx .stats-live .stat-row > div::before {
+    transform: scaleX(1);
+    transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.15s;
+  }
   .stat-value {
     font-family: var(--font-mono);
     font-size: 1.7rem; font-weight: 600;
-    color: #36454f; letter-spacing: -0.02em;
+    color: var(--ink); letter-spacing: -0.02em;
     font-feature-settings: "tnum" 1, "lnum" 1;
   }
   .stat-label {
     font-family: var(--font-mono);
-    font-size: 0.62rem; font-weight: 500; color: #708090;
+    font-size: 0.62rem; font-weight: 500; color: var(--muted);
     text-transform: uppercase; letter-spacing: 0.1em;
     opacity: 0.85;
   }
@@ -265,16 +396,33 @@ import SiteFooter from '../components/SiteFooter.astro';
   .nav-logo {
     font-family: var(--font-mono);
     font-size: 0.85rem; font-weight: 600;
-    letter-spacing: 0.16em; color: #36454f; text-decoration: none;
+    letter-spacing: 0.16em; color: var(--ink); text-decoration: none;
+  }
+  .nav-logo:focus-visible, .nav-links a:focus-visible {
+    outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 2px;
   }
   .nav-links { display: flex; gap: 2rem; list-style: none; }
   .nav-links a {
+    position: relative;
     font-family: var(--font-mono);
-    color: #708090; text-decoration: none;
+    color: var(--muted); text-decoration: none;
     font-size: 0.74rem; font-weight: 500; letter-spacing: 0.04em;
-    transition: color 0.2s;
+    transition: color 0.25s;
+    padding-bottom: 0.3rem;
   }
-  .nav-links a:hover { color: #36454f; }
+  .nav-links a::after {
+    content: "";
+    position: absolute; left: 0; bottom: 0;
+    width: 100%; height: 1px;
+    background: var(--ink);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .nav-links a:hover { color: var(--ink); }
+  .nav-links a:hover::after { transform: scaleX(0.4); }
+  .nav-links a.active { color: var(--ink); }
+  .nav-links a.active::after { transform: scaleX(1); }
 
   .scroll-hint {
     position: fixed; bottom: 2.5rem; left: 50%;
@@ -286,13 +434,14 @@ import SiteFooter from '../components/SiteFooter.astro';
   .scroll-hint span {
     font-family: var(--font-mono);
     font-size: 0.62rem; letter-spacing: 0.16em;
-    text-transform: uppercase; color: #aaaaaa; font-weight: 500;
+    text-transform: uppercase; color: var(--faint); font-weight: 500;
   }
   .scroll-arrow {
     width: 18px; height: 18px;
-    border-right: 1.5px solid #aaaaaa; border-bottom: 1.5px solid #aaaaaa;
-    transform: rotate(45deg); animation: bobDown 1.8s ease-in-out infinite;
+    border-right: 1.5px solid var(--faint); border-bottom: 1.5px solid var(--faint);
+    transform: rotate(45deg);
   }
+  .fx-motion .scroll-arrow { animation: bobDown 1.8s ease-in-out infinite; }
   @keyframes bobDown {
     0%, 100% { transform: rotate(45deg) translateY(0); }
     50% { transform: rotate(45deg) translateY(5px); }
@@ -300,14 +449,71 @@ import SiteFooter from '../components/SiteFooter.astro';
 
   .progress-bar {
     position: fixed; top: 0; left: 0; height: 1.5px;
-    background: linear-gradient(90deg, #c0c0c8, #888890);
+    background: var(--ink);
+    opacity: 0.55;
     z-index: 200; width: 0%;
   }
 
+  /* ── Instrument HUD — the page's tuner ───────────────────────────── */
+  .hud {
+    position: fixed; bottom: 2.1rem; left: 3vw;
+    z-index: 90;
+    display: flex; align-items: baseline; gap: 0.85rem;
+    font-family: var(--font-mono);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.8s ease 0.2s;
+  }
+  html.fx .hud { opacity: 1; }
+  html.fx.footer-vis .hud { opacity: 0; transition-delay: 0s; }
+  .hud-pitch {
+    font-size: 0.62rem; font-weight: 600;
+    letter-spacing: 0.16em; color: var(--faint);
+  }
+  .hud-hz {
+    font-size: 0.78rem; font-weight: 500;
+    letter-spacing: 0.06em; color: var(--muted);
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    min-width: 6.4ch;
+  }
+  .hud-state {
+    font-size: 0.6rem; font-weight: 600;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--faint);
+    transition: color 0.4s;
+  }
+  .hud.in-tune .hud-state { color: var(--ink); }
+  .fx-motion .hud.in-tune .hud-state { animation: tunePulse 2.6s ease-in-out infinite; }
+  @keyframes tunePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+
+  #wave-canvas {
+    position: fixed; bottom: 1.9rem; right: 3vw;
+    z-index: 90;
+    width: 156px; height: 36px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.8s ease 0.2s;
+  }
+  html.fx #wave-canvas { opacity: 0.9; }
+  html.fx.footer-vis #wave-canvas { opacity: 0; transition-delay: 0s; }
+
   .silver-line {
     width: 40px; height: 1.5px;
-    background: linear-gradient(90deg, #b0b0b8, #d0d0d8);
+    background: var(--line);
     margin: 0 auto 1.5rem;
+  }
+
+  /* Finale glow — grounds the CTA text against the instrument. */
+  .align-center .content-panel::before {
+    content: "";
+    position: absolute; inset: -3.5rem -4rem;
+    background: radial-gradient(closest-side, rgba(5, 6, 9, var(--cta-glow-a)) 20%, transparent 75%);
+    filter: blur(6px);
+    z-index: -1;
+    pointer-events: none;
   }
 
   /* Footer */
@@ -315,7 +521,7 @@ import SiteFooter from '../components/SiteFooter.astro';
     position: relative; z-index: 3;
     pointer-events: auto;
     padding: 3rem 6vw 2.5rem;
-    border-top: 1px solid rgba(112, 128, 144, 0.18);
+    border-top: 1px solid var(--line);
     background: transparent;
   }
   .footer-inner {
@@ -325,41 +531,60 @@ import SiteFooter from '../components/SiteFooter.astro';
   }
   .footer-brand {
     font-size: 0.85rem; font-weight: 700;
-    letter-spacing: 0.18em; color: #36454f;
+    letter-spacing: 0.18em; color: var(--ink);
   }
   .footer-nav {
     display: flex; flex-wrap: wrap; gap: 1.75rem;
   }
   .footer-nav a {
-    color: #708090; text-decoration: none;
+    color: var(--muted); text-decoration: none;
     font-size: 0.78rem; font-weight: 500;
     letter-spacing: 0.04em; transition: color 0.2s;
   }
-  .footer-nav a:hover { color: #36454f; }
+  .footer-nav a:hover { color: var(--ink); }
   .footer-meta {
-    font-size: 0.7rem; color: #9aa3a8;
+    font-size: 0.7rem; color: var(--faint);
     letter-spacing: 0.08em; flex-basis: 100%;
     margin-top: 0.5rem;
   }
 
-  /* Ripple animation for CTA text */
-  @keyframes textRipple {
-    0%   { transform: translateY(0) scaleY(1); }
-    15%  { transform: translateY(-3px) scaleY(1.01); }
-    30%  { transform: translateY(2px) scaleY(0.99); }
-    50%  { transform: translateY(-1.5px) scaleY(1.005); }
-    70%  { transform: translateY(1px) scaleY(0.998); }
-    85%  { transform: translateY(-0.5px) scaleY(1.002); }
-    100% { transform: translateY(0) scaleY(1); }
+  /* ── Responsive ──────────────────────────────────────────────────── */
+  @media (max-width: 860px) {
+    .ghost-num { font-size: clamp(10rem, 34vw, 16rem); opacity: 0.8; }
   }
-  .cta-ripple .section-title {
-    animation: textRipple 2.5s ease-out 1;
+
+  @media (max-width: 760px) {
+    .content-section { padding: 4.5rem 5vw; }
+
+    /* Legibility plate: the fork passes directly behind copy on small
+       screens, so panels sit on a frosted card that follows the theme. */
+    html.fx .content-panel {
+      background: rgba(var(--scrim-rgb), 0.6);
+      backdrop-filter: blur(18px) saturate(1.05);
+      -webkit-backdrop-filter: blur(18px) saturate(1.05);
+      padding: 1.6rem 1.4rem;
+      border-radius: 20px;
+      border: 1px solid rgba(var(--scrim-rgb), 0.35);
+      box-shadow: 0 18px 50px rgba(10, 14, 18, 0.12);
+    }
+    .align-center .content-panel::before { display: none; }
+
+    .nav-links { gap: 1.1rem; }
+    .nav-links li:not(:last-child) { display: none; }
+
+    #wave-canvas { display: none; }
+    .hud { bottom: 1.6rem; }
+
+    .btn { padding: 0.85rem 1.7rem; font-size: 0.84rem; }
+    .btn-ghost { margin-left: 0.5rem; }
+    .stat-row { gap: 1.9rem; }
   }
-  .cta-ripple .section-body {
-    animation: textRipple 2.5s ease-out 0.15s 1;
-  }
-  .cta-ripple .btn {
-    animation: textRipple 2.5s ease-out 0.3s 1;
+
+  @media (prefers-reduced-motion: reduce) {
+    html.fx .tl-i { transform: none; }
+    html.fx .rv { opacity: 1; transform: none; }
+    html.fx .stat-row > div::before { transform: scaleX(1); }
+    .btn, .nav-links a::after { transition-duration: 0.01s; }
   }
 </style>
 </head>
@@ -374,16 +599,19 @@ import SiteFooter from '../components/SiteFooter.astro';
 </svg>
 
 <div id="bg-overlay"></div>
+<div id="studio-backdrop"></div>
+<div id="ring-field" aria-hidden="true"></div>
 <div class="progress-bar" id="progressBar"></div>
 <canvas id="ripple-canvas"></canvas>
+<div id="grain" aria-hidden="true"></div>
 
 <nav>
   <a href="#" class="nav-logo">SEOPR1</a>
   <ul class="nav-links">
-    <li><a href="#visibility">AI Visibility</a></li>
-    <li><a href="#automation">AI Automation</a></li>
-    <li><a href="#platform">Platform</a></li>
-    <li><a href="#start">Get Tuned</a></li>
+    <li><a href="#visibility" data-nav="visibility">AI Visibility</a></li>
+    <li><a href="#automation" data-nav="automation">AI Automation</a></li>
+    <li><a href="#platform" data-nav="platform">Platform</a></li>
+    <li><a href="#start" data-nav="start">Get Tuned</a></li>
   </ul>
 </nav>
 
@@ -392,6 +620,13 @@ import SiteFooter from '../components/SiteFooter.astro';
   <div class="scroll-arrow"></div>
 </div>
 
+<div class="hud" id="hud" aria-hidden="true">
+  <span class="hud-pitch">A4</span>
+  <span class="hud-hz" id="hudHz">415.30 Hz</span>
+  <span class="hud-state" id="hudState">Flat</span>
+</div>
+<canvas id="wave-canvas" aria-hidden="true"></canvas>
+
 <div id="canvas-container"></div>
 
 <div id="scroll-spacer">
@@ -399,10 +634,10 @@ import SiteFooter from '../components/SiteFooter.astro';
   <!-- Hero -->
   <section class="content-section align-left" id="hero" style="padding-top:8rem;">
     <div class="content-panel" data-section="0">
-      <p class="hero-tag">AI Visibility &amp; Automation</p>
-      <h1 class="hero-title">Clients Ask AI<br>Before They<br>Ask You</h1>
-      <p class="section-body">If your firm isn't tuned to the frequency AI listens on, it recommends your competitors.</p>
-      <div>
+      <p class="hero-tag rv">AI Visibility &amp; Automation</p>
+      <h1 class="hero-title"><span class="tl"><span class="tl-i">Clients Ask AI</span></span><span class="tl"><span class="tl-i">Before They</span></span><span class="tl"><span class="tl-i">Ask You</span></span></h1>
+      <p class="section-body rv">If your firm isn't tuned to the frequency AI listens on, it recommends your competitors.</p>
+      <div class="rv">
         <a href="#start" class="btn btn-primary">Get in Harmony</a>
         <a href="#visibility" class="btn btn-ghost">See How</a>
       </div>
@@ -411,39 +646,42 @@ import SiteFooter from '../components/SiteFooter.astro';
 
   <!-- AI Visibility -->
   <section class="content-section align-right" id="visibility">
+    <div class="ghost-num" aria-hidden="true">01</div>
     <div class="content-panel" data-section="1">
-      <p class="section-tag">01 / AI Visibility</p>
-      <h2 class="section-title">AI Doesn't Rank.<br>It Recommends.</h2>
-      <p class="section-body">We tune your presence so AI cites your firm by name.</p>
+      <p class="section-tag rv">01 / AI Visibility</p>
+      <h2 class="section-title"><span class="tl"><span class="tl-i">AI Doesn't Rank.</span></span><span class="tl"><span class="tl-i">It Recommends.</span></span></h2>
+      <p class="section-body rv">We tune your presence so AI cites your firm by name.</p>
       <div class="stat-row">
-        <div><div class="stat-value">73%</div><div class="stat-label">Start with AI</div></div>
-        <div><div class="stat-value">0</div><div class="stat-label">Clicks needed</div></div>
+        <div class="rv"><div class="stat-value" data-count="73" data-suffix="%">73%</div><div class="stat-label">Start with AI</div></div>
+        <div class="rv"><div class="stat-value">0</div><div class="stat-label">Clicks needed</div></div>
       </div>
     </div>
   </section>
 
   <!-- AI Automation -->
   <section class="content-section align-left" id="automation">
+    <div class="ghost-num" aria-hidden="true">02</div>
     <div class="content-panel" data-section="2">
-      <p class="section-tag">02 / AI Automation</p>
-      <h2 class="section-title">Found by AI.<br>Run by AI.</h2>
-      <p class="section-body">Intake. Qualification. Scheduling. Follow-up. Instant. Always on.</p>
+      <p class="section-tag rv">02 / AI Automation</p>
+      <h2 class="section-title"><span class="tl"><span class="tl-i">Found by AI.</span></span><span class="tl"><span class="tl-i">Run by AI.</span></span></h2>
+      <p class="section-body rv">Intake. Qualification. Scheduling. Follow-up. Instant. Always on.</p>
       <div class="stat-row">
-        <div><div class="stat-value">&lt;90s</div><div class="stat-label">Response</div></div>
-        <div><div class="stat-value">24/7</div><div class="stat-label">Intake</div></div>
+        <div class="rv"><div class="stat-value">&lt;90s</div><div class="stat-label">Response</div></div>
+        <div class="rv"><div class="stat-value">24/7</div><div class="stat-label">Intake</div></div>
       </div>
     </div>
   </section>
 
   <!-- Platform -->
   <section class="content-section align-right" id="platform">
+    <div class="ghost-num" aria-hidden="true">03</div>
     <div class="content-panel" data-section="3">
-      <p class="section-tag">03 / The Platform</p>
-      <h2 class="section-title">Two Systems.<br>One Frequency.</h2>
-      <p class="section-body">Visibility tunes you for AI search. Automation converts attention into clients.</p>
+      <p class="section-tag rv">03 / The Platform</p>
+      <h2 class="section-title"><span class="tl"><span class="tl-i">Two Systems.</span></span><span class="tl"><span class="tl-i">One Frequency.</span></span></h2>
+      <p class="section-body rv">Visibility tunes you for AI search. Automation converts attention into clients.</p>
       <div class="stat-row">
-        <div><div class="stat-value">AV</div><div class="stat-label">Visibility</div></div>
-        <div><div class="stat-value">AA</div><div class="stat-label">Automation</div></div>
+        <div class="rv"><div class="stat-value">AV</div><div class="stat-label">Visibility</div></div>
+        <div class="rv"><div class="stat-value">AA</div><div class="stat-label">Automation</div></div>
       </div>
     </div>
   </section>
@@ -451,10 +689,10 @@ import SiteFooter from '../components/SiteFooter.astro';
   <!-- CTA -->
   <section class="content-section align-center" id="start">
     <div class="content-panel" data-section="4">
-      <div class="silver-line"></div>
-      <h2 class="section-title">Get in Harmony<br>with AI Search</h2>
-      <p class="section-body">Make sure AI answers with your name.</p>
-      <a href="https://api.leadconnectorhq.com/widget/booking/gjfNe8wqfqpzE4y1BSC8" target="_blank" rel="noopener" class="btn btn-primary">Schedule a Tuning</a>
+      <div class="silver-line rv"></div>
+      <h2 class="section-title"><span class="tl"><span class="tl-i">Get in Harmony</span></span><span class="tl"><span class="tl-i">with AI Search</span></span></h2>
+      <p class="section-body rv">Make sure AI answers with your name.</p>
+      <a href="https://api.leadconnectorhq.com/widget/booking/gjfNe8wqfqpzE4y1BSC8" target="_blank" rel="noopener" class="btn btn-primary rv" id="ctaBtn">Schedule a Tuning</a>
     </div>
   </section>
 
@@ -463,16 +701,348 @@ import SiteFooter from '../components/SiteFooter.astro';
 </div>
 
 <script is:inline>
-/* ═══════════════════════════════════════════════════
-   RENDERER
-   ═══════════════════════════════════════════════════ */
-const container = document.getElementById('canvas-container');
-const scene     = new THREE.Scene();
-const camera    = new THREE.PerspectiveCamera(36, window.innerWidth / window.innerHeight, 0.1, 100);
-const renderer  = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+(function () {
+'use strict';
 
+/* ═══════════════════════════════════════════════════
+   BOOT GUARD
+   Static page remains fully readable if any library
+   failed; in that case strip the fx classes and bail.
+   ═══════════════════════════════════════════════════ */
+const docEl = document.documentElement;
+if (!(window.THREE && window.gsap && window.ScrollTrigger)) {
+  docEl.classList.remove('fx', 'fx-motion');
+  return;
+}
+
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const COARSE  = window.matchMedia('(pointer: coarse)').matches;
+
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+} catch (e) {
+  // No WebGL: keep the DOM experience (reveals + theme) without 3D.
+  renderer = null;
+}
+
+/* ═══════════════════════════════════════════════════
+   FILM GRAIN (generated once — no network, tiny cost)
+   ═══════════════════════════════════════════════════ */
+(function makeGrain() {
+  const g = document.createElement('canvas');
+  g.width = 128; g.height = 128;
+  const gx = g.getContext('2d');
+  const img = gx.createImageData(128, 128);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 90 + Math.random() * 90;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255 * (Math.random() * 0.55 + 0.2);
+  }
+  gx.putImageData(img, 0, 0);
+  document.getElementById('grain').style.backgroundImage = `url(${g.toDataURL()})`;
+})();
+
+/* ═══════════════════════════════════════════════════
+   SMOOTH SCROLL — Lenis (desktop, fine pointer only)
+   ═══════════════════════════════════════════════════ */
+gsap.registerPlugin(ScrollTrigger);
+
+let lenis = null;
+if (!REDUCED && !COARSE && window.Lenis) {
+  lenis = new Lenis({ lerp: 0.095, wheelMultiplier: 1.0 });
+  lenis.on('scroll', ScrollTrigger.update);
+  gsap.ticker.add((time) => lenis.raf(time * 1000));
+  gsap.ticker.lagSmoothing(0);
+}
+
+// Anchor navigation goes through the smoother when it exists.
+document.querySelectorAll('a[href^="#"]').forEach((a) => {
+  a.addEventListener('click', (e) => {
+    const id = a.getAttribute('href');
+    if (id.length < 2) return;
+    const target = document.querySelector(id);
+    if (!target) return;
+    e.preventDefault();
+    if (lenis) lenis.scrollTo(target, { offset: 0, duration: 1.6 });
+    else target.scrollIntoView(REDUCED ? {} : { behavior: 'smooth' });
+  });
+});
+
+/* ═══════════════════════════════════════════════════
+   THEME ENGINE
+   One scroll progress → CSS custom properties.
+   Everything on the page reads these vars, so DOM and
+   3D re-tune together (fixes the stranded stat labels).
+   ═══════════════════════════════════════════════════ */
+const themePairs = {
+  '--ink':    [[54, 69, 79],    [244, 246, 248]],
+  '--muted':  [[112, 128, 144], [201, 206, 214]],
+  '--faint':  [[154, 163, 168], [139, 147, 156]],
+  '--btn-bg': [[54, 69, 79],    [244, 246, 248]],
+  '--btn-tx': [[255, 255, 255], [30, 39, 46]],
+  '--spot':   [[255, 255, 255], [24, 28, 33]],
+  '--edge':   [[236, 238, 240], [5, 6, 8]],
+};
+const lerpC = (a, b, t) => `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`;
+
+const ringField = document.getElementById('ring-field');
+const bgOverlay = document.getElementById('bg-overlay');
+let lastThemeP = -1;
+let themeMuted = 'rgb(112,128,144)'; // cached for the waveform stroke
+
+function applyTheme(p) {
+  if (Math.abs(p - lastThemeP) < 0.0006) return;
+  lastThemeP = p;
+
+  // Text flips well ahead of the background so contrast never dies mid-gray.
+  const tRaw = Math.min(1, Math.max(0, (p - 0.14) / 0.26));
+  const t = tRaw < 0.5 ? 2 * tRaw * tRaw : 1 - Math.pow(-2 * tRaw + 2, 2) / 2;
+
+  const s = docEl.style;
+  s.setProperty('--tp', t.toFixed(4));
+  for (const k in themePairs) s.setProperty(k, lerpC(themePairs[k][0], themePairs[k][1], t));
+  themeMuted = lerpC(themePairs['--muted'][0], themePairs['--muted'][1], t);
+  s.setProperty('--line', `rgba(${t < 0.5 ? '54,69,79' : '244,246,248'},${(0.22 + t * 0.02).toFixed(3)})`);
+  s.setProperty('--ghost-stroke', `rgba(${t < 0.5 ? '54,69,79' : '255,255,255'},${(0.15 - t * 0.05).toFixed(3)})`);
+  s.setProperty('--scrim-rgb', t < 0.5 ? '250,251,252' : '12,15,19');
+  s.setProperty('--cta-glow-a', (Math.max(0, p - 0.6) / 0.4 * 0.5).toFixed(3));
+
+  // Base plate under the studio backdrop.
+  const bg = Math.round(255 * (1 - p));
+  bgOverlay.style.background = `rgb(${bg},${bg},${Math.min(255, bg + 2)})`;
+
+  // Standing-wave field: silent at the poles, present through the journey,
+  // held gently at the finale so the ringing never fully stops.
+  const mid = Math.sin(Math.min(1, Math.max(0, (p - 0.06) / 0.94)) * Math.PI);
+  const finale = Math.max(0, (p - 0.82) / 0.18) * 0.5;
+  ringField.style.opacity = (mid * 0.55 + finale * 0.45).toFixed(3);
+  ringField.style.transform = `scale(${(1 + p * 0.3).toFixed(4)})`;
+  ringField.style.setProperty('--ring-c', `rgba(${t < 0.5 ? '96,110,124' : '214,222,232'},${(0.04 + t * 0.025).toFixed(3)})`);
+}
+applyTheme(0);
+
+/* ═══════════════════════════════════════════════════
+   SCROLL STATE + MASTER CHOREOGRAPHY
+   The journey: silence → rotation while the room goes
+   dark → the instrument returns face-on, upright, for
+   the strike. Spin ends at 2 full turns so the finale
+   always faces the audience.
+   ═══════════════════════════════════════════════════ */
+const scrollState = { spinY: 0, tiltZ: 0, camAngle: 0, camY: 0, bgProgress: 0 };
+
+if (!REDUCED) {
+  const masterTL = gsap.timeline({
+    scrollTrigger: { trigger: '#scroll-spacer', start: 'top top', end: 'bottom bottom', scrub: 1.2 }
+  });
+  masterTL
+    .to(scrollState, { spinY: Math.PI * 4, duration: 5, ease: 'none' }, 0)
+    .to(scrollState, { bgProgress: 1, duration: 4.0, ease: 'none' }, 0)
+    .to(scrollState, { camAngle: Math.PI * 0.34, camY: -0.28, duration: 3.8, ease: 'sine.inOut' }, 0)
+    .to(scrollState, { camAngle: 0, camY: 0.1, duration: 1.2, ease: 'power2.inOut' }, 3.8)
+    .to(scrollState, { tiltZ: 22, duration: 2.1, ease: 'power1.inOut' }, 0)
+    .to(scrollState, { tiltZ: 0, duration: 1.6, ease: 'power2.inOut' }, 3.4);
+} else {
+  // Reduced motion: no spin — a composed static pose; the room still
+  // darkens with reading position (color, not motion).
+  scrollState.spinY = -0.42;
+  scrollState.tiltZ = 8;
+  ScrollTrigger.create({
+    trigger: '#scroll-spacer', start: 'top top', end: 'bottom bottom',
+    onUpdate: (self) => { scrollState.bgProgress = self.progress; },
+  });
+}
+
+/* ── Progress bar ─────────────────────────────── */
+const progressBar = document.getElementById('progressBar');
+ScrollTrigger.create({
+  trigger: '#scroll-spacer', start: 'top top', end: 'bottom bottom',
+  onUpdate: (self) => { progressBar.style.width = (self.progress * 100) + '%'; }
+});
+
+/* ── Scroll hint ──────────────────────────────── */
+const scrollHint = document.getElementById('scrollHint');
+window.addEventListener('scroll', () => { scrollHint.classList.toggle('hidden', window.scrollY > 80); }, { passive: true });
+
+/* ═══════════════════════════════════════════════════
+   CONTENT CHOREOGRAPHY
+   Masked line reveals with stagger — played on entry,
+   reversed on the way back up. Environment scrubs;
+   language arrives with intent.
+   ═══════════════════════════════════════════════════ */
+const countUp = (el) => {
+  const target = parseFloat(el.dataset.count);
+  const suffix = el.dataset.suffix || '';
+  const obj = { v: 0 };
+  gsap.to(obj, {
+    v: target, duration: 1.4, ease: 'power2.out', delay: 0.25,
+    onUpdate: () => { el.textContent = Math.round(obj.v) + suffix; },
+  });
+};
+
+document.querySelectorAll('.content-panel').forEach((panel) => {
+  const section = panel.closest('.content-section');
+  const lines = panel.querySelectorAll('.tl-i');
+  const rvs = panel.querySelectorAll('.rv');
+
+  if (REDUCED) return; // CSS already forces visible states
+
+  const tl = gsap.timeline({ paused: true });
+  tl.to(lines, { y: 0, duration: 0.9, ease: 'power4.out', stagger: 0.09 }, 0)
+    .to(rvs, { opacity: 1, y: 0, duration: 0.7, ease: 'power3.out', stagger: 0.07 }, 0.12);
+
+  let counted = false;
+  const arm = () => {
+    section.classList.add('stats-live');
+    tl.play();
+    if (!counted) {
+      counted = true;
+      panel.querySelectorAll('[data-count]').forEach(countUp);
+    }
+  };
+
+  if (section.id === 'hero') {
+    // Load-in, not scroll-in.
+    window.addEventListener('load', () => setTimeout(arm, 180), { once: true });
+    setTimeout(arm, 900); // fallback if load already fired / hangs
+  } else {
+    ScrollTrigger.create({
+      trigger: section,
+      start: 'top 74%',
+      onEnter: arm,
+      onLeaveBack: () => { section.classList.remove('stats-live'); tl.reverse(); },
+    });
+  }
+});
+
+/* ── Ghost numerals drift slower than the page ── */
+if (!REDUCED) {
+  document.querySelectorAll('.ghost-num').forEach((el) => {
+    gsap.fromTo(el, { yPercent: 26 }, {
+      yPercent: -26, ease: 'none',
+      scrollTrigger: { trigger: el.closest('.content-section'), start: 'top bottom', end: 'bottom top', scrub: 1.2 },
+    });
+  });
+}
+
+/* ── HUD yields to the footer ─────────────────── */
+ScrollTrigger.create({
+  trigger: '.site-footer',
+  start: 'top 92%',
+  onEnter: () => docEl.classList.add('footer-vis'),
+  onLeaveBack: () => docEl.classList.remove('footer-vis'),
+});
+
+/* ── Active section in the nav ────────────────── */
+const navLinks = {};
+document.querySelectorAll('.nav-links a[data-nav]').forEach((a) => { navLinks[a.dataset.nav] = a; });
+['visibility', 'automation', 'platform', 'start'].forEach((id) => {
+  ScrollTrigger.create({
+    trigger: '#' + id,
+    start: 'top 55%', end: 'bottom 45%',
+    onToggle: (self) => {
+      if (navLinks[id]) navLinks[id].classList.toggle('active', self.isActive);
+    },
+  });
+});
+
+/* ═══════════════════════════════════════════════════
+   INSTRUMENT HUD — tuner + phase-locking waveform
+   The page tunes from A4♭ up to concert pitch: the Hz
+   readout climbs with scroll and locks at 440.00; the
+   two waveform traces (Visibility / Automation) drift
+   into phase and become one wave at the finale.
+   ═══════════════════════════════════════════════════ */
+const hud = document.getElementById('hud');
+const hudHz = document.getElementById('hudHz');
+const hudState = document.getElementById('hudState');
+const waveCanvas = document.getElementById('wave-canvas');
+const waveCtx = waveCanvas ? waveCanvas.getContext('2d') : null;
+let waveW = 156, waveH = 36;
+
+function sizeWave() {
+  if (!waveCanvas) return;
+  const dpr = Math.min(window.devicePixelRatio, 2);
+  waveCanvas.width = waveW * dpr;
+  waveCanvas.height = waveH * dpr;
+  waveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+sizeWave();
+
+let smoothVel = 0;
+let waveInk = 'rgb(112,128,144)';
+let lastScrollY = window.scrollY;
+
+function drawWave(time, p, strikeEnv) {
+  if (!waveCtx) return;
+  waveCtx.clearRect(0, 0, waveW, waveH);
+
+  const mid = waveH / 2;
+  const phaseGap = (1 - p) * 2.2;           // traces drift into unison
+  const locked = phaseGap < 0.08;
+  const amp = 4.5 + Math.min(9, smoothVel * 6) + strikeEnv * 9;
+  const freq = (Math.PI * 2 * 2.4) / waveW;
+
+  const trace = (phase, alpha, width) => {
+    waveCtx.beginPath();
+    for (let x = 0; x <= waveW; x += 2) {
+      const decay = strikeEnv > 0.01 ? 1 : 0.35 + 0.65 * Math.sin((x / waveW) * Math.PI);
+      const y = mid + Math.sin(x * freq + time * 2.1 + phase) * amp * decay * 0.5;
+      x === 0 ? waveCtx.moveTo(x, y) : waveCtx.lineTo(x, y);
+    }
+    waveCtx.globalAlpha = alpha;
+    waveCtx.lineWidth = width;
+    waveCtx.strokeStyle = waveInk;
+    waveCtx.stroke();
+    waveCtx.globalAlpha = 1;
+  };
+
+  if (locked) {
+    trace(0, 0.95, 1.6);
+  } else {
+    trace(0, 0.8, 1.1);
+    trace(phaseGap, 0.5, 1.1);
+  }
+}
+
+function updateHud(time, p, strikeEnv, striking) {
+  // 415.30 Hz (A♭4) → 440.00 Hz (A4, concert pitch)
+  const wander = REDUCED ? 0 : Math.sin(time * 0.9) * 0.6 * (1 - p) + Math.sin(time * 2.3) * 0.25 * (1 - p);
+  const hz = 415.3 + 24.7 * p + wander;
+  hudHz.textContent = hz.toFixed(2) + ' Hz';
+
+  const inTune = p > 0.965;
+  hud.classList.toggle('in-tune', inTune);
+  hudState.textContent = striking ? 'Ringing' : (inTune ? 'In tune' : 'Flat');
+
+  if (!REDUCED) drawWave(time, p, strikeEnv);
+}
+
+if (REDUCED && waveCtx) {
+  // One calm, locked trace — no animation.
+  smoothVel = 0;
+  drawWave(0, 1, 0);
+}
+
+/* ═══════════════════════════════════════════════════
+   RENDERER + SCENE  (skipped entirely without WebGL)
+   ═══════════════════════════════════════════════════ */
+if (!renderer) {
+  // DOM-only fallback: theme + HUD still track scroll.
+  gsap.ticker.add(() => {
+    applyTheme(scrollState.bgProgress);
+    updateHud(performance.now() / 1000, scrollState.bgProgress, 0, false);
+  });
+  return;
+}
+
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 100);
+
+const DPR_CAP = COARSE ? 1.75 : 2;
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, DPR_CAP));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
 renderer.outputEncoding = THREE.sRGBEncoding;
@@ -485,8 +1055,8 @@ container.appendChild(renderer.domElement);
    POST-PROCESSING RIPPLE SHADER
    ═══════════════════════════════════════════════════ */
 const renderTarget = new THREE.WebGLRenderTarget(
-  window.innerWidth * Math.min(window.devicePixelRatio, 2),
-  window.innerHeight * Math.min(window.devicePixelRatio, 2)
+  window.innerWidth * Math.min(window.devicePixelRatio, DPR_CAP),
+  window.innerHeight * Math.min(window.devicePixelRatio, DPR_CAP)
 );
 
 const rippleShaderMat = new THREE.ShaderMaterial({
@@ -564,7 +1134,8 @@ sizeRippleCanvas();
 /* ═══════════════════════════════════════════════════
    LIGHTING
    ═══════════════════════════════════════════════════ */
-scene.add(new THREE.AmbientLight(0xffffff, 0.18));
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.22);
+scene.add(ambientLight);
 
 const keyLight = new THREE.DirectionalLight(0xfff4e6, 1.1);
 keyLight.position.set(3, 7, 5);
@@ -580,7 +1151,7 @@ keyLight.shadow.bias = -0.0002;
 keyLight.shadow.radius = 4;
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xc8d4ee, 0.42);
+const fillLight = new THREE.DirectionalLight(0xc8d4ee, 0.5);
 fillLight.position.set(-5, 3, -3);
 scene.add(fillLight);
 
@@ -588,11 +1159,15 @@ const rimLight = new THREE.DirectionalLight(0xffffff, 0.85);
 rimLight.position.set(-1, -2, -6);
 scene.add(rimLight);
 
+const rimLight2 = new THREE.DirectionalLight(0xdfe8f4, 0.0);
+rimLight2.position.set(2.5, 1.5, -5);
+scene.add(rimLight2);
+
 const topLight = new THREE.DirectionalLight(0xeaf0ff, 0.32);
 topLight.position.set(0, 12, 0);
 scene.add(topLight);
 
-const frontFill = new THREE.PointLight(0xffe8d0, 0.18, 20);
+const frontFill = new THREE.PointLight(0xffe8d0, 0.2, 20);
 frontFill.position.set(0, 1, 8);
 scene.add(frontFill);
 
@@ -600,45 +1175,54 @@ scene.add(frontFill);
    ENVIRONMENT MAP — studio-photography envScene
    prefiltered through PMREMGenerator so PBR roughness
    gets proper mip-blurred reflections.
+
+   The horizon band is deliberately BRIGHT: a vertical
+   polished tube reflects mostly horizon, and a dark
+   horizon is what made the fork read as a silhouette.
    ═══════════════════════════════════════════════════ */
 const envScene = new THREE.Scene();
 
-// Sky dome: studio gradient with a subtle horizon line. Top reads as
-// soft daylight, below-horizon darker for an implied floor reflection.
-envScene.add(new THREE.Mesh(
-  new THREE.SphereGeometry(80, 64, 64),
-  new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    vertexShader: `varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
-    fragmentShader: `
-      varying vec3 vP;
-      void main(){
-        float y = normalize(vP).y;
-        float top = smoothstep(-0.05, 0.55, y);
-        vec3 sky = mix(vec3(0.13, 0.13, 0.16), vec3(0.68, 0.68, 0.74), top);
-        if (y < 0.0) sky = mix(sky, vec3(0.05, 0.05, 0.07), clamp(-y * 1.4, 0.0, 1.0));
-        gl_FragColor = vec4(sky, 1.0);
-      }
-    `,
-  })
-));
+// PMREM-safe materials ONLY in here. The previous ShaderMaterial sky and
+// softboxes rendered BLACK through PMREMGenerator in r128 — the metal was
+// reflecting an empty room, which is why the fork read as a silhouette.
+// Vertex-colored basic materials capture correctly.
+const skyGeo = new THREE.SphereGeometry(80, 64, 64);
+{
+  // Bright studio walls at eye level, soft daylight above, darker implied
+  // floor below. A vertical polished tube reflects mostly horizon, so the
+  // horizon band is deliberately bright.
+  const skyPos = skyGeo.attributes.position;
+  const skyCols = new Float32Array(skyPos.count * 3);
+  for (let i = 0; i < skyPos.count; i++) {
+    const y = skyPos.getY(i) / 80;
+    const top = Math.min(1, Math.max(0, (y + 0.08) / 0.68));
+    let r = 0.52 + (0.85 - 0.52) * top;
+    let g = 0.53 + (0.86 - 0.53) * top;
+    let b = 0.57 + (0.90 - 0.57) * top;
+    if (y < 0) {
+      const f = Math.min(1, -y * 1.6);
+      r += (0.10 - r) * f; g += (0.10 - g) * f; b += (0.13 - b) * f;
+    }
+    skyCols[i * 3] = r; skyCols[i * 3 + 1] = g; skyCols[i * 3 + 2] = b;
+  }
+  skyGeo.setAttribute('color', new THREE.BufferAttribute(skyCols, 3));
+}
+envScene.add(new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
 
 // Studio softbox panels — bright rectangular sources produce the
 // recognizable elongated highlights that read as "polished metal."
-// Aimed toward origin so the rectangle face is visible in reflection.
 const softboxes = [
-  { pos: [ 11,  13,   8], size: [ 9,  6, 0.4], color: [1.6, 1.55, 1.45] }, // warm key, above-front-right
-  { pos: [ -9,   9,   6], size: [ 7,  5, 0.4], color: [1.05, 1.10, 1.30] }, // cool fill, above-front-left
-  { pos: [  0,  17,   0], size: [ 8,  8, 0.4], color: [1.35, 1.40, 1.55] }, // skylight overhead
-  { pos: [  4,  -2, -10], size: [ 4,  3, 0.4], color: [1.45, 1.05, 0.70] }, // warm rim, behind-below
+  { pos: [ 11,  13,   8], size: [10,  7, 0.4], color: [1.75, 1.7, 1.6]  }, // warm key, above-front-right
+  { pos: [ -9,   9,   6], size: [ 8,  6, 0.4], color: [1.15, 1.2, 1.42] }, // cool fill, above-front-left
+  { pos: [  0,  17,   0], size: [ 9,  9, 0.4], color: [1.45, 1.5, 1.65] }, // skylight overhead
+  { pos: [  4,  -2, -10], size: [ 5,  4, 0.4], color: [1.55, 1.15, 0.8] }, // warm rim, behind-below
+  { pos: [ -3,   0,  11], size: [12,  3, 0.4], color: [1.3, 1.32, 1.4]  }, // long front strip at tube height
 ];
 softboxes.forEach(({ pos, size, color }) => {
-  const mat = new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: new THREE.Color().fromArray(color) } },
-    vertexShader: `void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-    fragmentShader: `uniform vec3 uColor; void main(){ gl_FragColor = vec4(uColor, 1.0); }`,
-  });
-  const m = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
+  const m = new THREE.Mesh(
+    new THREE.BoxGeometry(...size),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color().fromArray(color) })
+  );
   m.position.set(...pos);
   m.lookAt(0, 0, 0);
   envScene.add(m);
@@ -649,7 +1233,7 @@ for (let i = 0; i < 14; i++) {
   const ang = (i / 14) * Math.PI * 2 + Math.random() * 0.3;
   const r = 22 + Math.random() * 18;
   const y = -10 + Math.random() * 28;
-  const b = 0.55 + Math.random() * 0.5;
+  const b = 0.6 + Math.random() * 0.5;
   const m = new THREE.Mesh(
     new THREE.SphereGeometry(0.4 + Math.random() * 0.7, 8, 8),
     new THREE.MeshBasicMaterial({ color: new THREE.Color(b, b, b * (0.9 + Math.random() * 0.2)) })
@@ -707,26 +1291,28 @@ function makeBrushedMetalRoughnessMap() {
 
 const roughnessTex = makeBrushedMetalRoughnessMap();
 
-// Tines + U-bend: highest-polish satin steel with light clearcoat.
+// Tines + U-bend: satin instrument steel with light clearcoat.
+// Roughness keeps a floor so the metal always shows brushed body
+// instead of collapsing into a dark mirror.
 const silverMat = new THREE.MeshPhysicalMaterial({
-  color: 0xe6e6ea,
-  metalness: 0.98,
-  roughness: 0.22,
+  color: 0xe9e9ee,
+  metalness: 0.96,
+  roughness: 0.24,
   roughnessMap: roughnessTex,
   envMap: cubeRT.texture,
-  envMapIntensity: 1.05,
+  envMapIntensity: 1.15,
   clearcoat: 0.5,
   clearcoatRoughness: 0.08,
 });
 
 // Grip rings: more matte for tactile contrast against the polished bar.
 const gripMat = new THREE.MeshPhysicalMaterial({
-  color: 0xa8a8ae,
+  color: 0xb2b2b8,
   metalness: 0.85,
   roughness: 0.55,
   roughnessMap: roughnessTex,
   envMap: cubeRT.texture,
-  envMapIntensity: 0.7,
+  envMapIntensity: 0.8,
   clearcoat: 0.15,
   clearcoatRoughness: 0.4,
 });
@@ -839,7 +1425,8 @@ for (let i = 0; i <= hSteps; i++) {
 
 const handleGeo = new THREE.LatheGeometry(handleProfile, SEG);
 handleGeo.computeVertexNormals();
-forkGroup.add(new THREE.Mesh(handleGeo, silverMat));
+const handleMesh = new THREE.Mesh(handleGeo, silverMat);
+forkGroup.add(handleMesh);
 
 /* ── Grip rings ───────────────────────────────── */
 const gripStart = handleBottom + handleLen * 0.08;
@@ -869,7 +1456,10 @@ forkGroup.add(collar);
 /* ── Cast shadows ─────────────────────────────── */
 forkGroup.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
 
-/* ── Center vertically ────────────────────────── */
+/* ── Frame the whole instrument ───────────────── */
+// Slightly scaled down + camera pulled back so the tips live inside the
+// frame at the hero instead of cropping into a smear at the top edge.
+forkGroup.scale.setScalar(0.88);
 const bbox = new THREE.Box3().setFromObject(forkGroup);
 const centerY = (bbox.min.y + bbox.max.y) / 2;
 forkGroup.position.y = -centerY;
@@ -883,76 +1473,76 @@ const contactFloor = new THREE.Mesh(
   new THREE.ShadowMaterial({ opacity: 0.22 })
 );
 contactFloor.rotation.x = -Math.PI / 2;
-contactFloor.position.y = (bbox.min.y - centerY) - 0.02;
+contactFloor.position.y = bbox.min.y - centerY - 0.02;
 contactFloor.receiveShadow = true;
 scene.add(contactFloor);
 
 /* ═══════════════════════════════════════════════════
    CAMERA
    ═══════════════════════════════════════════════════ */
-const camDist = 8.5;
+const camDist = COARSE ? 11.0 : 9.7;
 camera.position.set(0, 0, camDist);
 camera.lookAt(0, 0, 0);
 
 /* ═══════════════════════════════════════════════════
-   SCROLL STATE
+   POINTER — the instrument leans with you, and a
+   click anywhere on it strikes the fork.
    ═══════════════════════════════════════════════════ */
-gsap.registerPlugin(ScrollTrigger);
+const pointer = { x: 0, y: 0, tx: 0, ty: 0, overFork: false };
+const raycaster = new THREE.Raycaster();
+const pointerNDC = new THREE.Vector2();
 
-const scrollState = {
-  spinY: 0, tiltZ: 0, camAngle: 0, camY: 0, bgProgress: 0,
-};
+// Generous invisible hit volume: aiming "at the instrument" should count,
+// including the air between the tines.
+const hitProxy = new THREE.Mesh(
+  new THREE.CylinderGeometry(prongSep + 0.32, 0.3, tipY - handleBottom + 0.6, 12),
+  new THREE.MeshBasicMaterial({ visible: false })
+);
+hitProxy.position.y = (tipY + handleBottom) / 2;
+forkGroup.add(hitProxy);
+const forkMeshes = [forkHead, handleMesh, hitProxy];
 
-const masterTL = gsap.timeline({
-  scrollTrigger: { trigger: '#scroll-spacer', start: 'top top', end: 'bottom bottom', scrub: 1.8 }
-});
-masterTL.to(scrollState, {
-  spinY: Math.PI * 3.5, camAngle: Math.PI * 0.3, camY: -0.25, bgProgress: 1,
-  duration: 5, ease: 'none',
-});
+if (!REDUCED && !COARSE) {
+  window.addEventListener('pointermove', (e) => {
+    pointer.tx = (e.clientX / window.innerWidth) * 2 - 1;
+    pointer.ty = (e.clientY / window.innerHeight) * 2 - 1;
+    pointerNDC.set(pointer.tx, -pointer.ty);
+    raycaster.setFromCamera(pointerNDC, camera);
+    const hit = raycaster.intersectObjects(forkMeshes, false).length > 0;
+    if (hit !== pointer.overFork) {
+      pointer.overFork = hit;
+      document.body.style.cursor = hit ? 'pointer' : '';
+    }
+  }, { passive: true });
+}
 
-const tiltTL = gsap.timeline({
-  scrollTrigger: { trigger: '#scroll-spacer', start: 'top top', end: 'bottom bottom', scrub: 1.8 }
-});
-tiltTL.to(scrollState, { tiltZ: 25, duration: 2.5, ease: 'power2.out' });
-tiltTL.to(scrollState, { tiltZ: 10, duration: 2.5, ease: 'power2.inOut' });
-
-/* ── Content reveals ──────────────────────────── */
-const panels = document.querySelectorAll('.content-panel');
-panels.forEach((panel, i) => {
-  gsap.to(panel, {
-    opacity: 1, y: 0, duration: 1, ease: 'power2.out',
-    scrollTrigger: { trigger: panel.closest('.content-section'), start: 'top 70%', end: 'top 25%', scrub: 0.6 }
-  });
-  /* Text stays visible — no fade-out, scrolls off naturally */
-});
-
-/* ── Scroll hint ──────────────────────────────── */
-const scrollHint = document.getElementById('scrollHint');
-window.addEventListener('scroll', () => { scrollHint.classList.toggle('hidden', window.scrollY > 80); });
-
-/* ── Progress bar ─────────────────────────────── */
-const progressBar = document.getElementById('progressBar');
-ScrollTrigger.create({
-  trigger: '#scroll-spacer', start: 'top top', end: 'bottom bottom',
-  onUpdate: (self) => { progressBar.style.width = (self.progress * 100) + '%'; }
+let lastStrikeAt = -10;
+window.addEventListener('pointerdown', (e) => {
+  if (REDUCED) return;
+  if (e.target.closest('a, button, nav, .content-panel, footer')) return;
+  pointerNDC.set((e.clientX / window.innerWidth) * 2 - 1, -((e.clientY / window.innerHeight) * 2 - 1));
+  raycaster.setFromCamera(pointerNDC, camera);
+  if (raycaster.intersectObjects(forkMeshes, false).length > 0) {
+    const now = performance.now() / 1000;
+    if (now - lastStrikeAt > 2.2) fireStrike();
+  }
 });
 
 /* ═══════════════════════════════════════════════════
    STRIKE EFFECT SYSTEM
+   Fires once as the finale enters — and again any
+   time the visitor strikes the instrument directly.
    ═══════════════════════════════════════════════════ */
 let strikeActive   = false;
 let strikeTime     = 0;      // seconds since strike
-let strikeHasFired = false;  // only fires once per page load
+let afterglow      = false;  // "still ringing" state after first strike
 
 const STRIKE_DURATION  = 6.0;  // total effect duration in seconds
 const VIBRATION_FREQ   = 28;   // Hz — vibration frequency of prongs
-const VIBRATION_AMP    = 0.12; // max lateral displacement (3x bigger)
+const VIBRATION_AMP    = 0.12; // max lateral displacement
 const RIPPLE_COUNT     = 10;   // number of expanding rings per pole
-const RIPPLE_SPEED     = 600;  // pixels per second expansion rate (faster, bigger)
-const RIPPLE_INTERVAL  = 0.12; // seconds between successive ring births (tighter)
-const SHAKE_AMP        = 0.08; // camera shake amplitude
-const SHAKE_FREQ       = 18;   // camera shake frequency Hz
+const RIPPLE_SPEED     = 600;  // pixels per second expansion rate
+const RIPPLE_INTERVAL  = 0.12; // seconds between successive ring births
 
 // Post-process ripple state
 let usePostRipple = false;
@@ -962,31 +1552,29 @@ const domRippleEls = [];
 const domDisplace = document.getElementById('dom-displace');
 const domTurb = document.getElementById('dom-turb');
 
-// Trigger strike when final section enters view
+function fireStrike() {
+  lastStrikeAt = performance.now() / 1000;
+  strikeActive = true;
+  strikeTime = 0;
+  usePostRipple = true;
+  if (domRippleEls.length === 0) {
+    // Wiggle children of panels — never the GSAP-animated panel itself,
+    // whose transform belongs to the reveal timeline.
+    document.querySelectorAll('.content-panel > *, nav, .scroll-hint, .hud').forEach(el => {
+      el.style.filter = 'url(#dom-ripple)';
+      el.style.willChange = 'filter';
+      domRippleEls.push(el);
+    });
+  }
+}
+
+// The crescendo: the room is dark, the instrument faces you, and as the
+// final section arrives the fork is struck.
 ScrollTrigger.create({
   trigger: '#start',
   start: 'top 60%',
   once: true,
-  onEnter: () => {
-    if (!strikeHasFired) {
-      strikeHasFired = true;
-      strikeActive = true;
-      strikeTime = 0;
-      usePostRipple = true;
-      // Apply SVG ripple filter to all visible DOM content
-      // Target children of .content-panel — NOT the panel itself.
-      // The panel is GSAP-animated (translateY 60px -> 0 on scroll reveal).
-      // Overriding its transform here would clobber GSAP's value, then on
-      // cleanup the inline transform gets cleared and the panel snaps back
-      // to its CSS-initial translateY(60px). Wiggling the children
-      // preserves the visual effect without fighting the scroll reveal.
-      document.querySelectorAll('.content-panel > *, nav, .scroll-hint, .progress-bar').forEach(el => {
-        el.style.filter = 'url(#dom-ripple)';
-        el.style.willChange = 'filter';
-        domRippleEls.push(el);
-      });
-    }
-  }
+  onEnter: () => { if (!REDUCED) fireStrike(); },
 });
 
 /* ── Project 3D point to 2D screen coords ─────── */
@@ -1012,12 +1600,34 @@ function getProngTipWorldPositions() {
 }
 
 /* ── Draw ripple rings on 2D canvas ───────────── */
-function drawRipples(dt) {
+function drawRipples(dt, now) {
   rippleCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-  if (!strikeActive) return;
 
   const W = window.innerWidth;
   const H = window.innerHeight;
+
+  // Afterglow: once struck, the instrument never fully falls silent —
+  // slow, faint rings keep breathing outward from the tips.
+  if (afterglow && !strikeActive && !REDUCED && scrollState.bgProgress > 0.5) {
+    const [wl, wr] = getProngTipWorldPositions();
+    const sL = projectToScreen(wl);
+    const sR = projectToScreen(wr);
+    const cx = (sL.x + sR.x) / 2;
+    const cy = (sL.y + sR.y) / 2;
+    for (let k = 0; k < 2; k++) {
+      const phase = ((now * 0.22 + k * 0.5) % 1);
+      const radius = 30 + phase * 420;
+      const alpha = (1 - phase) * 0.05;
+      rippleCtx.beginPath();
+      rippleCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+      rippleCtx.strokeStyle = `rgba(226,230,240,${alpha.toFixed(3)})`;
+      rippleCtx.lineWidth = 1;
+      rippleCtx.stroke();
+    }
+  }
+
+  if (!strikeActive) return;
+
   const [wl, wr] = getProngTipWorldPositions();
   const screenL = projectToScreen(wl);
   const screenR = projectToScreen(wr);
@@ -1034,7 +1644,7 @@ function drawRipples(dt) {
 
   // ── SHOCKWAVE PULSE from fork epicenter ─────
   if (strikeTime < 0.3) {
-    const blastA = Math.max(0, 1 - strikeTime / 0.3) * 0.45;
+    const blastA = Math.max(0, 1 - strikeTime / 0.3) * 0.4;
     const blastR = 80 + strikeTime * 2500; // rapidly expanding flash
     const grad = rippleCtx.createRadialGradient(epicenterX, epicenterY, 0, epicenterX, epicenterY, blastR);
     grad.addColorStop(0, `rgba(255,255,255,${blastA})`);
@@ -1049,7 +1659,7 @@ function drawRipples(dt) {
   if (strikeTime < 3.0) {
     const pulsePhase = Math.sin(strikeTime * VIBRATION_FREQ * Math.PI * 2);
     const pulseDecay = Math.max(0, 1 - strikeTime / 3.0);
-    const pulseA = pulseDecay * pulseDecay * Math.abs(pulsePhase) * 0.08;
+    const pulseA = pulseDecay * pulseDecay * Math.abs(pulsePhase) * 0.07;
     const grad = rippleCtx.createRadialGradient(epicenterX, epicenterY, 0, epicenterX, epicenterY, Math.max(W, H) * 0.7);
     grad.addColorStop(0, `rgba(255,255,255,${pulseA * 0.5})`);
     grad.addColorStop(0.3, `rgba(220,220,240,${pulseA})`);
@@ -1059,13 +1669,13 @@ function drawRipples(dt) {
     rippleCtx.fillRect(0, 0, W, H);
   }
 
-  // ── DRAMATIC FLASH at each pole ─────────────
+  // ── FLASH at each pole ──────────────────────
   if (strikeTime < 0.8) {
     const flashA = Math.max(0, 1 - strikeTime / 0.8);
     [screenL, screenR].forEach(pole => {
       const r1 = 150 + strikeTime * 250;
       const grad = rippleCtx.createRadialGradient(pole.x, pole.y, 0, pole.x, pole.y, r1);
-      grad.addColorStop(0, `rgba(255,255,255,${flashA * 0.9})`);
+      grad.addColorStop(0, `rgba(255,255,255,${flashA * 0.85})`);
       grad.addColorStop(0.1, `rgba(240,240,255,${flashA * 0.6})`);
       grad.addColorStop(0.3, `rgba(200,200,230,${flashA * 0.25})`);
       grad.addColorStop(0.6, `rgba(180,180,210,${flashA * 0.08})`);
@@ -1096,7 +1706,7 @@ function drawRipples(dt) {
   }
 
   // ── Expanding ripple rings ─────────────────
-  [screenL, screenR].forEach((pole, poleIdx) => {
+  [screenL, screenR].forEach((pole) => {
     for (let r = 0; r < RIPPLE_COUNT; r++) {
       const birthTime = r * RIPPLE_INTERVAL;
       const age = strikeTime - birthTime;
@@ -1156,7 +1766,7 @@ function drawRipples(dt) {
 }
 
 /* ── Vibrate prong vertices ───────────────────── */
-function vibrateProng(dt) {
+function vibrateProng() {
   if (!strikeActive) return;
 
   // Decay envelope for vibration
@@ -1164,11 +1774,10 @@ function vibrateProng(dt) {
   const amp = VIBRATION_AMP * decay;
 
   if (amp < 0.0002) {
-    // Vibration is negligible — restore and stop
+    // Vibration is negligible — restore and let the ripples finish out
     positions.array.set(origPositions);
     positions.needsUpdate = true;
     tubeGeo.computeVertexNormals();
-    strikeActive = false;
     return;
   }
 
@@ -1177,7 +1786,6 @@ function vibrateProng(dt) {
   for (let i = 0; i < positions.count; i++) {
     const origX = origPositions[i * 3];
     const origY = origPositions[i * 3 + 1];
-    const origZ = origPositions[i * 3 + 2];
 
     // Only vibrate vertices in the prong region (above U-bend)
     if (origY > uTop - 0.05) {
@@ -1204,98 +1812,75 @@ function vibrateProng(dt) {
 /* ═══════════════════════════════════════════════════
    RENDER LOOP
    ═══════════════════════════════════════════════════ */
-const bgOverlay = document.getElementById('bg-overlay');
-const ambientLight = scene.children.find(c => c.isAmbientLight);
+const ctaBtn = document.getElementById('ctaBtn');
 let lastTime = performance.now();
+let strikeEnvSmoothed = 0;
 
 function animate() {
   requestAnimationFrame(animate);
 
-  const now = performance.now();
-  const dt = (now - lastTime) / 1000;
-  lastTime = now;
+  const nowMs = performance.now();
+  const dt = Math.min(0.05, (nowMs - lastTime) / 1000);
+  lastTime = nowMs;
+  const now = nowMs / 1000;
 
   const p = scrollState.bgProgress;
 
-  /* ── Background ─────────────────────────────── */
-  const bg = Math.round(255 * (1 - p));
-  bgOverlay.style.background = `rgb(${bg},${bg},${bg})`;
+  /* ── Theme: one write-through of CSS custom props ── */
+  applyTheme(p);
 
-  /* ── Continuous font color interpolation ────── */
-  // Helper: lerp between two [r,g,b] arrays
-  function lerpC(a, b, t) {
-    return a.map((v, i) => Math.round(v + (b[i] - v) * t));
-  }
-  function rgb(c) { return `rgb(${c[0]},${c[1]},${c[2]})`; }
+  /* ── Scroll velocity (for the waveform's liveliness) ── */
+  const rawVel = lenis ? Math.abs(lenis.velocity) / 60 : Math.abs(window.scrollY - lastScrollY) / 14;
+  lastScrollY = window.scrollY;
+  smoothVel += (Math.min(2.2, rawVel) - smoothVel) * 0.08;
 
-  // Light mode → Dark mode color pairs (dark-mode values pushed bright for strong contrast)
-  const titleL = [54,69,79], titleD = [255,255,255];
-  const tagL   = [112,128,144], tagD = [200,200,215];
-  const bodyL  = [112,128,144], bodyD = [210,210,220];
-  const navL   = [54,69,79], navD = [245,245,245];
-  const navLnkL = [112,128,144], navLnkD = [200,200,210];
-  const btnBgL = [54,69,79], btnBgD = [255,255,255];
-  const btnTxL = [255,255,255], btnTxD = [54,69,79];
-  const ghostL = [54,69,79], ghostD = [255,255,255];
+  /* ── Instrument HUD ─────────────────────────── */
+  const strikeEnvTarget = strikeActive ? Math.max(0, 1 - strikeTime / STRIKE_DURATION) : 0;
+  strikeEnvSmoothed += (strikeEnvTarget - strikeEnvSmoothed) * 0.1;
+  updateHud(now, p, strikeEnvSmoothed, strikeActive && strikeTime < 3.2);
+  waveInk = themeMuted;
 
-  // Ultra-steep text color flip — text transitions way ahead of background
-  // so there's always strong contrast (no gray-on-gray dead zone)
-  const textP = Math.min(1, Math.max(0, (p - 0.15) / 0.25)); // remap: starts at p=0.15, done by p=0.40
-  const ease = textP < 0.5 ? 2*textP*textP : 1 - Math.pow(-2*textP+2,2)/2;
+  /* ── Silver adapts: brighter, cleaner metal as the room darkens ── */
+  const b = 0.9 + p * 0.06;
+  silverMat.color.setRGB(b, b, b + 0.015);
+  silverMat.roughness = 0.24 - p * 0.09;
+  silverMat.envMapIntensity = 1.15 + p * 0.75;
+  gripMat.color.setRGB(b - 0.05, b - 0.05, b - 0.03);
+  gripMat.envMapIntensity = 0.8 + p * 0.4;
 
-  document.querySelectorAll('.hero-title, .section-title').forEach(el => el.style.color = rgb(lerpC(titleL, titleD, ease)));
-  document.querySelectorAll('.hero-tag, .section-tag').forEach(el => el.style.color = rgb(lerpC(tagL, tagD, ease)));
-  document.querySelectorAll('.section-body').forEach(el => el.style.color = rgb(lerpC(bodyL, bodyD, ease)));
-  document.querySelectorAll('.stat-value').forEach(el => el.style.color = rgb(lerpC(tagL, tagD, ease)));
-  document.querySelector('.nav-logo').style.color = rgb(lerpC(navL, navD, ease));
-  document.querySelectorAll('.nav-links a').forEach(el => el.style.color = rgb(lerpC(navLnkL, navLnkD, ease)));
-  document.querySelectorAll('.btn-primary').forEach(el => {
-    el.style.background = rgb(lerpC(btnBgL, btnBgD, ease));
-    el.style.color = rgb(lerpC(btnTxL, btnTxD, ease));
-  });
-  document.querySelectorAll('.btn-ghost').forEach(el => {
-    el.style.color = rgb(lerpC(ghostL, ghostD, ease));
-    el.style.borderColor = `rgba(${lerpC([211,211,211],[255,255,255], ease).join(',')},${0.6 - ease * 0.45})`;
-  });
-  const hintC = rgb(lerpC([170,170,170],[100,100,100], ease));
-  document.querySelectorAll('.scroll-hint span').forEach(el => el.style.color = hintC);
-  document.querySelectorAll('.scroll-arrow').forEach(el => { el.style.borderRightColor = hintC; el.style.borderBottomColor = hintC; });
+  /* ── Fork pose: scroll choreography + breath + pointer lean ── */
+  pointer.x += (pointer.tx - pointer.x) * 0.055;
+  pointer.y += (pointer.ty - pointer.y) * 0.055;
 
-  /* ── Silver adapts ──────────────────────────── */
-  const b = 0.82 + p * 0.14;
-  silverMat.color.setRGB(b, b, b + 0.02);
-  silverMat.roughness = 0.06 - p * 0.02;
-  silverMat.envMapIntensity = 1.4 + p * 0.4;
-  gripMat.color.setRGB(b - 0.04, b - 0.04, b - 0.02);
-
-  /* ── Fork rotation ──────────────────────────── */
-  forkGroup.rotation.y = scrollState.spinY;
+  const breatheY = REDUCED ? 0 : Math.sin(now * 0.55) * 0.045;
+  forkGroup.position.y = -centerY + breatheY;
+  forkGroup.rotation.y = scrollState.spinY + pointer.x * 0.1;
   forkGroup.rotation.z = THREE.MathUtils.degToRad(scrollState.tiltZ);
-  forkGroup.rotation.x = 0;
+  forkGroup.rotation.x = pointer.y * 0.055;
 
   /* ── Camera ─────────────────────────────────── */
-  camera.position.x = Math.sin(scrollState.camAngle) * camDist;
+  camera.position.x = Math.sin(scrollState.camAngle) * camDist + pointer.x * 0.22;
   camera.position.z = Math.cos(scrollState.camAngle) * camDist;
-  camera.position.y = scrollState.camY;
+  camera.position.y = scrollState.camY - pointer.y * 0.16;
   camera.lookAt(0, 0, 0);
 
-  /* camera shake removed — replaced by post-process ripple */
-
-  /* ── Lighting ───────────────────────────────── */
-  keyLight.intensity = 1.2 + p * 0.6;
-  rimLight.intensity = 0.6 + p * 0.5;
-  ambientLight.intensity = 0.35 - p * 0.1;
-  frontFill.intensity = 0.3 + p * 0.2;
+  /* ── Lighting: the darker the room, the more the metal is rimmed ── */
+  keyLight.intensity = 1.15 + p * 0.5;
+  rimLight.intensity = 0.7 + p * 1.0;
+  rimLight2.intensity = p * 0.85 + (pointer.overFork ? 0.25 : 0);
+  ambientLight.intensity = 0.22 + p * 0.06;
+  frontFill.intensity = 0.2 + p * 0.35;
+  if (afterglow && !REDUCED) {
+    rimLight.intensity += Math.sin(now * 1.3) * 0.12 * p;
+  }
 
   /* ── Strike effect ──────────────────────────── */
   if (strikeActive) {
     strikeTime += dt;
+    vibrateProng();
 
     // ── Animate SVG displacement filter on DOM elements ──
-    // Each element gets its own displacement based on distance from fork epicenter,
-    // so the ripple propagates outward from the tuning fork's prong tips.
     if (domDisplace && domTurb && domRippleEls.length > 0) {
-      // Get fork epicenter in screen coords
       const [tipL, tipR] = getProngTipWorldPositions();
       const sL = projectToScreen(tipL);
       const sR = projectToScreen(tipR);
@@ -1319,18 +1904,10 @@ function animate() {
         const elCY = rect.top + rect.height / 2;
         const dist = Math.sqrt((elCX - forkCX) ** 2 + (elCY - forkCY) ** 2);
 
-        // How close is this element to the current wavefront?
         const distFromWavefront = Math.abs(dist - wavefrontRadius);
-        // Element is in the active ripple band — intensity peaks at wavefront
         const bandInfluence = Math.max(0, 1 - distFromWavefront / wavefrontWidth);
-        // Overall decay envelope
         const elDecay = Math.exp(-strikeTime * 0.5);
-        // Combined: wavefront proximity * decay * base intensity
-        const elScale = bandInfluence * elDecay * 35;
 
-        // Apply per-element scale via unique filter if needed,
-        // or use the shared filter with element-specific CSS transform to fake it
-        // Since SVG filter scale is shared, modulate via opacity + CSS transform
         const ripplePhase = Math.sin((dist * 0.008) - strikeTime * 4) * bandInfluence * elDecay;
         const tx = ripplePhase * 3;
         const ty = ripplePhase * 1.5;
@@ -1343,10 +1920,10 @@ function animate() {
       domDisplace.setAttribute('scale', peakScale.toFixed(2));
     }
 
-    // ── Post-process ripple is handled via the shader (see below) ──
-
     if (strikeTime > STRIKE_DURATION) {
       strikeActive = false;
+      afterglow = true;
+      if (ctaBtn) ctaBtn.classList.add('ringing');
       rippleCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
       usePostRipple = false;
       // Clean up DOM ripple filters and transforms
@@ -1392,7 +1969,7 @@ function animate() {
   }
 
   // Draw 2D ripple rings AFTER 3D render
-  drawRipples(dt);
+  drawRipples(dt, now);
 }
 animate();
 
@@ -1401,10 +1978,13 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  const pr = Math.min(window.devicePixelRatio, 2);
+  const pr = Math.min(window.devicePixelRatio, DPR_CAP);
   renderTarget.setSize(window.innerWidth * pr, window.innerHeight * pr);
   sizeRippleCanvas();
+  sizeWave();
 });
+
+})();
 </script>
 </body>
 </html>
